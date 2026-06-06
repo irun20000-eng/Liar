@@ -99,22 +99,25 @@ function saveScore() {
   }
 }
 
+// 외부/저장 데이터 정제: { 카테고리: [{word, spy}] } 형태만 남김
+function sanitizeCustom(obj) {
+  const out = {};
+  if (!obj || typeof obj !== "object") return out;
+  for (const cat of Object.keys(obj)) {
+    if (typeof cat !== "string" || !cat.trim() || !Array.isArray(obj[cat])) continue;
+    const items = obj[cat]
+      .filter((e) => e && typeof e.word === "string" && e.word.trim())
+      .map((e) => ({ word: e.word.trim(), spy: (typeof e.spy === "string" ? e.spy : "").trim() }));
+    if (items.length) out[cat] = items;
+  }
+  return out;
+}
+
 function loadCustom() {
   try {
     const raw = localStorage.getItem(STORE_CUSTOM);
     if (!raw) return;
-    const obj = JSON.parse(raw);
-    if (obj && typeof obj === "object") {
-      // 형식 검증: { cat: [{word, spy}] }
-      customWords = {};
-      for (const cat of Object.keys(obj)) {
-        if (!Array.isArray(obj[cat])) continue;
-        const items = obj[cat]
-          .filter((e) => e && typeof e.word === "string" && e.word.trim())
-          .map((e) => ({ word: e.word.trim(), spy: (e.spy || "").trim() }));
-        if (items.length) customWords[cat] = items;
-      }
-    }
+    customWords = sanitizeCustom(JSON.parse(raw));
   } catch (e) {
     /* 무시 */
   }
@@ -572,6 +575,9 @@ function initEditor() {
   $("#btn-add-word").addEventListener("click", addOrUpdateWord);
   $("#btn-edit-cancel").addEventListener("click", cancelEdit);
   $("#btn-clear-words").addEventListener("click", clearAllCustom);
+  $("#btn-export").addEventListener("click", exportCustom);
+  $("#btn-import").addEventListener("click", () => $("#import-file").click());
+  $("#import-file").addEventListener("change", handleImportFile);
   $("#btn-editor-back").addEventListener("click", () => {
     cancelEdit();
     renderCategoryChips(); // 새 카테고리 반영
@@ -703,6 +709,82 @@ function clearAllCustom() {
   renderCustomList();
 }
 
+// ----- 내보내기/가져오기 -----
+function ioMsg(msg, ok) {
+  const el = $("#io-msg");
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = ok ? "#15795e" : "";
+  el.classList.remove("hidden", "shake");
+  void el.offsetWidth;
+  el.classList.add("shake");
+}
+
+function exportCustom() {
+  if (Object.keys(customWords).length === 0) {
+    ioMsg("내보낼 단어가 없어요 🥺", false);
+    return;
+  }
+  try {
+    const blob = new Blob([JSON.stringify(customWords, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "라이어-제시어.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    ioMsg("파일로 내보냈어요! 📤", true);
+  } catch (e) {
+    ioMsg("내보내기에 실패했어요 😢", false);
+  }
+}
+
+// 텍스트(JSON)를 받아 기존 단어에 병합. 추가된 개수 반환
+function importCustomFromText(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    ioMsg("파일을 읽을 수 없어요 (형식 오류) 😢", false);
+    return 0;
+  }
+  const incoming = sanitizeCustom(parsed);
+  let added = 0;
+  for (const cat of Object.keys(incoming)) {
+    if (!customWords[cat]) customWords[cat] = [];
+    const seen = new Set(customWords[cat].map((e) => e.word + "|" + e.spy));
+    for (const e of incoming[cat]) {
+      const key = e.word + "|" + e.spy;
+      if (!seen.has(key)) {
+        customWords[cat].push(e);
+        seen.add(key);
+        added++;
+      }
+    }
+    if (!settings.categories.includes(cat)) settings.categories.push(cat);
+  }
+  if (added > 0) {
+    saveCustom();
+    saveSettings();
+    renderCatOptions();
+    renderCustomList();
+  }
+  ioMsg(added > 0 ? `${added}개 단어를 가져왔어요! 📥` : "새로 가져올 단어가 없었어요", added > 0);
+  return added;
+}
+
+function handleImportFile(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => importCustomFromText(String(reader.result));
+  reader.onerror = () => ioMsg("파일을 읽을 수 없어요 😢", false);
+  reader.readAsText(file);
+  e.target.value = ""; // 같은 파일 다시 선택 가능하도록 초기화
+}
+
 function renderCustomList() {
   const list = $("#custom-list");
   list.innerHTML = "";
@@ -765,4 +847,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initResult();
   initEditor();
   showScreen("screen-setup");
+
+  // PWA: 서비스 워커 등록 (http/https에서만, file://에서는 건너뜀)
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 });

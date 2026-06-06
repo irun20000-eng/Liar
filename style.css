@@ -239,6 +239,8 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .icon-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #ffe3ec; }
+.editor-io { display: flex; gap: 10px; margin-top: 14px; }
+.small-btn { font-size: 16px; padding: 13px; margin-top: 0; }
 
 /* ===== 결과 화면 연출 ===== */
 #screen-result { position: relative; }

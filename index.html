@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#ff8fb1" />
   <title>🎭 라이어 게임</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AD%3C/text%3E%3C/svg%3E" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="라이어 게임" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
@@ -129,6 +136,12 @@
           <button id="btn-clear-words" class="mini-btn">전체 삭제</button>
         </div>
         <div id="custom-list" class="custom-list"></div>
+        <div class="editor-io">
+          <button type="button" id="btn-export" class="primary-btn ghost small-btn">📤 내보내기</button>
+          <button type="button" id="btn-import" class="primary-btn ghost small-btn">📥 가져오기</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden />
+        </div>
+        <p id="io-msg" class="warn-text hidden"></p>
       </div>
 
       <button id="btn-editor-back" class="primary-btn">설정으로 돌아가기 🏠</button>
