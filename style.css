@@ -106,6 +106,22 @@ body {
 }
 .step-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #e9c84e; }
 
+/* ===== 플레이어 이름 입력 ===== */
+.name-list { display: flex; flex-direction: column; gap: 8px; }
+.name-row { display: flex; align-items: center; gap: 10px; }
+.name-num {
+  width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%;
+  background: var(--lemon); color: var(--ink); font-size: 15px;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 #e9c84e;
+}
+.name-input {
+  flex: 1; padding: 11px 14px; border-radius: 14px;
+  border: 3px solid #ffe3ec; background: var(--cream); color: var(--ink);
+  font-family: inherit; font-size: 16px; outline: none; transition: border-color .15s; min-width: 0;
+}
+.name-input::placeholder { color: #c9b6c2; }
+.name-input:focus { border-color: var(--pink); }
+
 /* ===== 칩 (카테고리/투표) ===== */
 .chip-group { display: flex; flex-wrap: wrap; gap: 9px; }
 .chip {

@@ -10,13 +10,14 @@ const STORE_CUSTOM = "liar.custom.v1";
 
 // ----- 설정 상태 -----
 const settings = {
-  playerCount: 4,
+  playerCount: 5,
   liarCount: 1,
   categories: [], // 선택된 카테고리 이름들
   spyMode: false,
   comeback: true,
   timer: false,
   easy: true, // 쉬움 모드: 라이어에게 카테고리 힌트 제공
+  playerNames: ["아빠", "엄마", "예예", "두지", "토리"], // 기본 닉네임
 };
 
 // ----- 누적 점수판 -----
@@ -60,6 +61,8 @@ function loadSettings() {
     if (typeof saved.comeback === "boolean") settings.comeback = saved.comeback;
     if (typeof saved.timer === "boolean") settings.timer = saved.timer;
     if (typeof saved.easy === "boolean") settings.easy = saved.easy;
+    if (Array.isArray(saved.playerNames))
+      settings.playerNames = saved.playerNames.map((n) => (typeof n === "string" ? n : "")).slice(0, MAX_PLAYERS);
     // 더 이상 존재하지 않는 카테고리는 걸러내기
     const valid = new Set(Object.keys(WORD_BANK));
     settings.categories = settings.categories.filter((c) => valid.has(c));
@@ -182,6 +185,7 @@ function initSetup() {
   $("#btn-edit-words").addEventListener("click", openEditor);
 
   renderCounts();
+  renderNameInputs();
   renderScoreboard();
 }
 
@@ -228,6 +232,7 @@ function changePlayers(delta) {
   // 라이어 수는 항상 (플레이어 수 - 1) 이하
   settings.liarCount = Math.min(settings.liarCount, settings.playerCount - 1);
   renderCounts();
+  renderNameInputs();
   saveSettings();
 }
 
@@ -241,6 +246,42 @@ function changeLiars(delta) {
 function renderCounts() {
   $("#player-count").textContent = settings.playerCount;
   $("#liar-count").textContent = settings.liarCount;
+}
+
+// 플레이어 i의 표시 이름 (비어 있으면 "플레이어 N")
+function getPlayerName(i) {
+  const n = settings.playerNames[i];
+  return n && n.trim() ? n.trim() : `플레이어 ${i + 1}`;
+}
+
+// 플레이어 수에 맞춰 이름 입력칸 다시 그리기
+function renderNameInputs() {
+  const list = $("#name-list");
+  if (!list) return;
+  list.innerHTML = "";
+  for (let i = 0; i < settings.playerCount; i++) {
+    const row = document.createElement("div");
+    row.className = "name-row";
+
+    const num = document.createElement("span");
+    num.className = "name-num";
+    num.textContent = i + 1;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "name-input";
+    input.value = settings.playerNames[i] || "";
+    input.placeholder = `플레이어 ${i + 1}`;
+    input.maxLength = 12;
+    input.addEventListener("input", () => {
+      settings.playerNames[i] = input.value;
+      saveSettings();
+    });
+
+    row.appendChild(num);
+    row.appendChild(input);
+    list.appendChild(row);
+  }
 }
 
 // ===================================================================
@@ -317,7 +358,7 @@ function startGame() {
     const isLiar = liarSet.has(i);
     players.push({
       id: i,
-      name: `플레이어 ${i + 1}`,
+      name: getPlayerName(i),
       isLiar,
       // 시민: 제시어 / 스파이모드 라이어: 비슷한 단어 / 기본 라이어: 없음
       word: isLiar ? (settings.spyMode ? spyWord : null) : entry.word,
