@@ -85,7 +85,49 @@
         <button type="button" id="btn-reset-score" class="mini-btn">초기화</button>
       </div>
 
-      <button id="btn-start" class="primary-btn">게임 시작 🎈</button>
+      <div class="setup-actions">
+        <button id="btn-edit-words" class="primary-btn ghost">✏️ 제시어 편집</button>
+        <button id="btn-start" class="primary-btn">게임 시작 🎈</button>
+      </div>
+    </section>
+
+    <!-- ===== 제시어 편집 화면 ===== -->
+    <section id="screen-editor" class="screen">
+      <header class="title">
+        <h1>✏️ 제시어 편집</h1>
+        <p class="subtitle">우리 가족만의 단어를 추가해요 🐥</p>
+      </header>
+
+      <div class="card-panel">
+        <label class="field">
+          <span class="field-label">카테고리</span>
+          <input id="edit-category" class="text-input" list="cat-options" placeholder="기존 선택 또는 새 카테고리 입력" />
+          <datalist id="cat-options"></datalist>
+        </label>
+        <label class="field">
+          <span class="field-label">제시어 (시민 단어)</span>
+          <input id="edit-word" class="text-input" placeholder="예: 사과" />
+        </label>
+        <label class="field">
+          <span class="field-label">스파이 단어 (선택)</span>
+          <input id="edit-spy" class="text-input" placeholder="비슷한 단어 (스파이 모드용)" />
+        </label>
+        <p id="edit-warning" class="warn-text hidden"></p>
+        <div class="btn-row">
+          <button id="btn-add-word" class="primary-btn">추가하기</button>
+          <button id="btn-edit-cancel" class="primary-btn ghost hidden">취소</button>
+        </div>
+      </div>
+
+      <div class="card-panel">
+        <div class="field-label-row">
+          <span class="field-label">내가 추가한 단어</span>
+          <button id="btn-clear-words" class="mini-btn">전체 삭제</button>
+        </div>
+        <div id="custom-list" class="custom-list"></div>
+      </div>
+
+      <button id="btn-editor-back" class="primary-btn">설정으로 돌아가기 🏠</button>
     </section>
 
     <!-- ===== 역할 확인 화면 (돌려쓰기) ===== -->

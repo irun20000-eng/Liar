@@ -6,6 +6,7 @@ const MAX_PLAYERS = 12;
 const DEFAULT_TIMER = 180; // 3분
 const STORE_SETTINGS = "liar.settings.v1";
 const STORE_SCORE = "liar.score.v1";
+const STORE_CUSTOM = "liar.custom.v1";
 
 // ----- 설정 상태 -----
 const settings = {
@@ -21,10 +22,26 @@ const settings = {
 // ----- 누적 점수판 -----
 const score = { citizens: 0, liars: 0, round: 0 };
 
+// ----- 사용자 추가 단어 -----
+// { 카테고리이름: [ { word, spy }, ... ] }
+let customWords = {};
+let editingRef = null; // 편집 중인 항목 { cat, index }
+
 // ----- 진행 중 게임 상태 -----
 let game = null;
 let timerId = null;
 let lastWord = null; // 같은 단어 연속 출제 방지용
+
+// 기본 단어 + 사용자 단어를 합친 실제 사용 은행
+function getBank() {
+  const bank = {};
+  for (const k of Object.keys(WORD_BANK)) bank[k] = WORD_BANK[k].slice();
+  for (const k of Object.keys(customWords)) {
+    if (!bank[k]) bank[k] = [];
+    bank[k] = bank[k].concat(customWords[k]);
+  }
+  return bank;
+}
 
 // ===================================================================
 //  저장/불러오기 (localStorage)
@@ -82,6 +99,35 @@ function saveScore() {
   }
 }
 
+function loadCustom() {
+  try {
+    const raw = localStorage.getItem(STORE_CUSTOM);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === "object") {
+      // 형식 검증: { cat: [{word, spy}] }
+      customWords = {};
+      for (const cat of Object.keys(obj)) {
+        if (!Array.isArray(obj[cat])) continue;
+        const items = obj[cat]
+          .filter((e) => e && typeof e.word === "string" && e.word.trim())
+          .map((e) => ({ word: e.word.trim(), spy: (e.spy || "").trim() }));
+        if (items.length) customWords[cat] = items;
+      }
+    }
+  } catch (e) {
+    /* 무시 */
+  }
+}
+
+function saveCustom() {
+  try {
+    localStorage.setItem(STORE_CUSTOM, JSON.stringify(customWords));
+  } catch (e) {
+    /* 무시 */
+  }
+}
+
 // ----- DOM 헬퍼 -----
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
@@ -110,24 +156,11 @@ function pick(arr) {
 function initSetup() {
   const hadSaved = loadSettings();
   loadScore();
+  loadCustom();
 
-  // 카테고리 칩 생성 (저장된 선택 복원, 첫 실행이면 전부 선택)
-  const catList = $("#category-list");
-  catList.innerHTML = "";
-  Object.keys(WORD_BANK).forEach((cat) => {
-    const selected = hadSaved ? settings.categories.includes(cat) : true;
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "chip" + (selected ? " selected" : "");
-    chip.textContent = cat;
-    chip.addEventListener("click", () => {
-      chip.classList.toggle("selected");
-      syncCategories();
-      saveSettings();
-    });
-    catList.appendChild(chip);
-  });
-  syncCategories();
+  // 첫 실행이면 모든 카테고리 선택
+  if (!hadSaved) settings.categories = Object.keys(getBank());
+  renderCategoryChips();
 
   // 스테퍼
   $("#player-minus").addEventListener("click", () => changePlayers(-1));
@@ -143,9 +176,30 @@ function initSetup() {
 
   $("#btn-start").addEventListener("click", startGame);
   $("#btn-reset-score").addEventListener("click", resetScore);
+  $("#btn-edit-words").addEventListener("click", openEditor);
 
   renderCounts();
   renderScoreboard();
+}
+
+// 카테고리 칩 다시 그리기 (사용자 단어 추가 후에도 호출)
+function renderCategoryChips() {
+  const catList = $("#category-list");
+  catList.innerHTML = "";
+  Object.keys(getBank()).forEach((cat) => {
+    const selected = settings.categories.includes(cat);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (selected ? " selected" : "");
+    chip.textContent = cat;
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("selected");
+      syncCategories();
+      saveSettings();
+    });
+    catList.appendChild(chip);
+  });
+  syncCategories();
 }
 
 function bindToggle(sel, key) {
@@ -213,6 +267,7 @@ function startGame() {
   if (settings.categories.length === 0) {
     const warn = $("#cat-warning");
     if (warn) {
+      warn.textContent = "카테고리를 하나 이상 골라줘! 🥺";
       warn.classList.remove("hidden");
       warn.classList.remove("shake");
       void warn.offsetWidth; // 리플로우로 애니메이션 재시작
@@ -223,12 +278,31 @@ function startGame() {
   const warn = $("#cat-warning");
   if (warn) warn.classList.add("hidden");
 
-  const category = pick(settings.categories);
+  const bank = getBank();
+  // 선택된 카테고리 중 단어가 실제로 있는 것만 사용
+  const usable = settings.categories.filter((c) => bank[c] && bank[c].length > 0);
+  if (usable.length === 0) {
+    const warn = $("#cat-warning");
+    if (warn) {
+      warn.textContent = "선택한 카테고리에 단어가 없어요 🥺";
+      warn.classList.remove("hidden");
+    }
+    return;
+  }
+
+  const category = pick(usable);
   // 같은 단어 연속 출제 방지 (선택지가 2개 이상일 때 직전 단어는 다시 뽑지 않음)
-  const poolAll = WORD_BANK[category];
+  const poolAll = bank[category];
   const pool = poolAll.filter((e) => e.word !== lastWord);
   const entry = pick(pool.length > 0 ? pool : poolAll);
   lastWord = entry.word;
+
+  // 스파이 단어 결정 (사용자 단어가 스파이 미입력이면 같은 카테고리의 다른 단어로 대체)
+  let spyWord = entry.spy;
+  if (!spyWord) {
+    const others = poolAll.filter((e) => e.word !== entry.word);
+    spyWord = others.length > 0 ? pick(others).word : entry.word;
+  }
 
   // 라이어 인덱스 선정
   const indices = shuffle([...Array(settings.playerCount).keys()]);
@@ -243,14 +317,14 @@ function startGame() {
       name: `플레이어 ${i + 1}`,
       isLiar,
       // 시민: 제시어 / 스파이모드 라이어: 비슷한 단어 / 기본 라이어: 없음
-      word: isLiar ? (settings.spyMode ? entry.spy : null) : entry.word,
+      word: isLiar ? (settings.spyMode ? spyWord : null) : entry.word,
     });
   }
 
   game = {
     category,
     word: entry.word,
-    spyWord: entry.spy,
+    spyWord: spyWord,
     players,
     revealIndex: 0,
     votedId: null,
@@ -484,6 +558,194 @@ function initResult() {
 }
 
 // ===================================================================
+//  제시어 편집기
+// ===================================================================
+function initEditor() {
+  $("#btn-add-word").addEventListener("click", addOrUpdateWord);
+  $("#btn-edit-cancel").addEventListener("click", cancelEdit);
+  $("#btn-clear-words").addEventListener("click", clearAllCustom);
+  $("#btn-editor-back").addEventListener("click", () => {
+    cancelEdit();
+    renderCategoryChips(); // 새 카테고리 반영
+    showScreen("screen-setup");
+  });
+}
+
+function openEditor() {
+  cancelEdit();
+  renderCatOptions();
+  renderCustomList();
+  showScreen("screen-editor");
+}
+
+// 카테고리 입력 자동완성 목록 (기존 카테고리)
+function renderCatOptions() {
+  const dl = $("#cat-options");
+  dl.innerHTML = "";
+  Object.keys(getBank()).forEach((cat) => {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    dl.appendChild(opt);
+  });
+}
+
+function showEditWarn(msg) {
+  const w = $("#edit-warning");
+  w.textContent = msg;
+  w.classList.remove("hidden", "shake");
+  void w.offsetWidth;
+  w.classList.add("shake");
+}
+
+function addOrUpdateWord() {
+  const cat = $("#edit-category").value.trim();
+  const word = $("#edit-word").value.trim();
+  const spy = $("#edit-spy").value.trim();
+
+  if (!cat || !word) {
+    showEditWarn("카테고리와 제시어를 입력해줘! 🥺");
+    return;
+  }
+
+  // 편집 중이면 기존 항목 제거 후 다시 추가 (카테고리 변경도 지원)
+  if (editingRef) {
+    removeEntry(editingRef.cat, editingRef.index);
+    editingRef = null;
+  }
+
+  if (!customWords[cat]) customWords[cat] = [];
+  customWords[cat].push({ word, spy });
+  saveCustom();
+
+  // 새 카테고리라면 선택 목록에 추가
+  if (!settings.categories.includes(cat)) {
+    settings.categories.push(cat);
+    saveSettings();
+  }
+
+  // 입력칸 정리 (카테고리는 연속 입력 편하게 유지)
+  $("#edit-word").value = "";
+  $("#edit-spy").value = "";
+  $("#edit-warning").classList.add("hidden");
+  $("#btn-add-word").textContent = "추가하기";
+  $("#btn-edit-cancel").classList.add("hidden");
+
+  renderCatOptions();
+  renderCustomList();
+  $("#edit-word").focus();
+}
+
+function startEditEntry(cat, index) {
+  const entry = customWords[cat][index];
+  if (!entry) return;
+  editingRef = { cat, index };
+  $("#edit-category").value = cat;
+  $("#edit-word").value = entry.word;
+  $("#edit-spy").value = entry.spy || "";
+  $("#btn-add-word").textContent = "수정 완료";
+  $("#btn-edit-cancel").classList.remove("hidden");
+  $("#edit-warning").classList.add("hidden");
+  $("#edit-word").focus();
+}
+
+function cancelEdit() {
+  editingRef = null;
+  $("#edit-word").value = "";
+  $("#edit-spy").value = "";
+  $("#btn-add-word").textContent = "추가하기";
+  $("#btn-edit-cancel").classList.add("hidden");
+  $("#edit-warning").classList.add("hidden");
+}
+
+// 내부: 항목 제거 (빈 카테고리는 정리)
+function removeEntry(cat, index) {
+  if (!customWords[cat]) return;
+  customWords[cat].splice(index, 1);
+  if (customWords[cat].length === 0) {
+    delete customWords[cat];
+    // 기본 단어가 없는 순수 사용자 카테고리였다면 선택 목록에서도 제거
+    if (!WORD_BANK[cat]) {
+      settings.categories = settings.categories.filter((c) => c !== cat);
+      saveSettings();
+    }
+  }
+  saveCustom();
+}
+
+function deleteEntry(cat, index) {
+  removeEntry(cat, index);
+  // 편집 중이던 항목을 지웠다면 폼 초기화
+  if (editingRef && editingRef.cat === cat) cancelEdit();
+  renderCatOptions();
+  renderCustomList();
+}
+
+function clearAllCustom() {
+  if (Object.keys(customWords).length === 0) return;
+  if (!confirm("내가 추가한 단어를 모두 삭제할까요?")) return;
+  // 순수 사용자 카테고리는 선택 목록에서 제거
+  for (const cat of Object.keys(customWords)) {
+    if (!WORD_BANK[cat]) settings.categories = settings.categories.filter((c) => c !== cat);
+  }
+  customWords = {};
+  saveCustom();
+  saveSettings();
+  cancelEdit();
+  renderCatOptions();
+  renderCustomList();
+}
+
+function renderCustomList() {
+  const list = $("#custom-list");
+  list.innerHTML = "";
+  const cats = Object.keys(customWords);
+  if (cats.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "custom-empty";
+    empty.textContent = "아직 추가한 단어가 없어요. 위에서 만들어 보세요! ✨";
+    list.appendChild(empty);
+    return;
+  }
+  cats.forEach((cat) => {
+    const group = document.createElement("div");
+    group.className = "custom-group";
+    const head = document.createElement("div");
+    head.className = "custom-cat";
+    head.textContent = cat;
+    group.appendChild(head);
+
+    customWords[cat].forEach((entry, index) => {
+      const item = document.createElement("div");
+      item.className = "custom-item";
+
+      const text = document.createElement("span");
+      text.className = "custom-text";
+      text.textContent = entry.spy ? `${entry.word}  ↔  ${entry.spy}` : entry.word;
+      item.appendChild(text);
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "icon-btn";
+      editBtn.textContent = "✏️";
+      editBtn.setAttribute("aria-label", "수정");
+      editBtn.addEventListener("click", () => startEditEntry(cat, index));
+      item.appendChild(editBtn);
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "icon-btn";
+      delBtn.textContent = "🗑️";
+      delBtn.setAttribute("aria-label", "삭제");
+      delBtn.addEventListener("click", () => deleteEntry(cat, index));
+      item.appendChild(delBtn);
+
+      group.appendChild(item);
+    });
+    list.appendChild(group);
+  });
+}
+
+// ===================================================================
 //  부트스트랩
 // ===================================================================
 document.addEventListener("DOMContentLoaded", () => {
@@ -493,5 +755,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initVote();
   initComeback();
   initResult();
+  initEditor();
   showScreen("screen-setup");
 });
