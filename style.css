@@ -9,7 +9,7 @@
   --lemon: #ffe27a;
   --grape: #c4a7ff;
   --ink: #6b5566;
-  --ink-soft: #9a8794;
+  --ink-soft: #7d6a78;
   --white: #ffffff;
   --shadow: #e7b9c9;
   --radius: 24px;
@@ -47,17 +47,18 @@ body {
 /* ===== 떠다니는 배경 장식 ===== */
 .bg-decor { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .bg-decor span {
-  position: absolute; font-size: 30px; opacity: .5;
+  position: absolute; font-size: 28px; opacity: .3; filter: blur(.4px);
   animation: floaty linear infinite;
 }
-.bg-decor span:nth-child(1) { left: 6%;  top: 14%; font-size: 34px; animation-duration: 13s; }
-.bg-decor span:nth-child(2) { left: 84%; top: 10%; animation-duration: 17s; animation-delay: -3s; }
-.bg-decor span:nth-child(3) { left: 14%; top: 70%; font-size: 38px; animation-duration: 15s; animation-delay: -6s; }
-.bg-decor span:nth-child(4) { left: 78%; top: 64%; animation-duration: 19s; animation-delay: -2s; }
-.bg-decor span:nth-child(5) { left: 46%; top: 8%;  animation-duration: 16s; animation-delay: -9s; }
-.bg-decor span:nth-child(6) { left: 90%; top: 40%; font-size: 40px; animation-duration: 21s; animation-delay: -5s; }
-.bg-decor span:nth-child(7) { left: 4%;  top: 44%; animation-duration: 18s; animation-delay: -11s; }
-.bg-decor span:nth-child(8) { left: 60%; top: 84%; animation-duration: 14s; animation-delay: -1s; }
+/* 헤더(상단 중앙) 영역을 피해 가장자리·하단 위주로 배치 */
+.bg-decor span:nth-child(1) { left: 3%;  top: 34%; font-size: 32px; animation-duration: 13s; }
+.bg-decor span:nth-child(2) { left: 91%; top: 26%; animation-duration: 17s; animation-delay: -3s; }
+.bg-decor span:nth-child(3) { left: 7%;  top: 66%; font-size: 36px; animation-duration: 15s; animation-delay: -6s; }
+.bg-decor span:nth-child(4) { left: 86%; top: 60%; animation-duration: 19s; animation-delay: -2s; }
+.bg-decor span:nth-child(5) { left: 48%; top: 90%; animation-duration: 16s; animation-delay: -9s; }
+.bg-decor span:nth-child(6) { left: 93%; top: 44%; font-size: 34px; animation-duration: 21s; animation-delay: -5s; }
+.bg-decor span:nth-child(7) { left: 2%;  top: 50%; animation-duration: 18s; animation-delay: -11s; }
+.bg-decor span:nth-child(8) { left: 62%; top: 80%; animation-duration: 14s; animation-delay: -1s; }
 @keyframes floaty {
   0%   { transform: translateY(0) rotate(0deg); }
   50%  { transform: translateY(-26px) rotate(12deg); }
@@ -93,7 +94,6 @@ body {
 .field { display: flex; flex-direction: column; gap: 10px; }
 .field-row { flex-direction: row; align-items: center; justify-content: space-between; }
 .field-label { font-size: 16px; color: var(--ink); }
-.field-label::before { content: "🌸 "; }
 
 /* ===== 스테퍼 ===== */
 .stepper { display: flex; align-items: center; gap: 14px; }
@@ -160,7 +160,7 @@ body {
 /* ===== 역할 확인 ===== */
 .reveal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; text-align: center; }
 .progress-text { color: var(--ink-soft); font-size: 15px; background: #fff; padding: 4px 14px; border-radius: 999px; box-shadow: 0 3px 0 #ffe3ec; }
-#reveal-handoff { font-size: 24px; color: var(--pink-deep); }
+#reveal-handoff { font-size: 24px; color: var(--pink-deep); text-shadow: 1px 1px 0 #fff, 0 0 8px #fff8; }
 .role-card { width: 100%; max-width: 320px; aspect-ratio: 3 / 4; perspective: 1200px; cursor: pointer; position: relative; }
 .role-card:active { transform: scale(.98); }
 .card-face {
@@ -191,7 +191,10 @@ body {
 .card-hint .big-emoji { display: block; font-size: 64px; margin-bottom: 8px; animation: bob 2s ease-in-out infinite; }
 .role-label { font-size: 20px; color: var(--ink-soft); }
 .role-word { font-size: 46px; color: var(--pink-deep); text-shadow: 2px 2px 0 #fff; }
-.role-desc { font-size: 15px; color: var(--ink-soft); line-height: 1.55; white-space: pre-line; }
+.role-desc {
+  font-size: 15px; color: #5b4a55; line-height: 1.5; white-space: pre-line;
+  background: rgba(255, 255, 255, .62); padding: 9px 14px; border-radius: 14px;
+}
 
 /* ===== 점수판 ===== */
 .scoreboard {
@@ -239,6 +242,8 @@ body {
 
 /* ===== 결과 화면 연출 ===== */
 #screen-result { position: relative; }
+/* 제목+결과 카드를 버튼 위 공간의 수직 중앙으로 */
+#screen-result .title { margin-top: auto; }
 #screen-result.win #result-title { animation: titlePop .6s cubic-bezier(.34,1.7,.5,1) both; }
 #screen-result.lose #result-title { animation: titleSad .6s ease both; }
 @keyframes titlePop { 0% { transform: scale(.3) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.15) rotate(4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }

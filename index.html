@@ -26,7 +26,7 @@
 
       <div class="card-panel">
         <label class="field field-row">
-          <span class="field-label">플레이어 수</span>
+          <span class="field-label">👥 플레이어 수</span>
           <div class="stepper">
             <button type="button" id="player-minus" class="step-btn">−</button>
             <span id="player-count">4</span>
@@ -35,7 +35,7 @@
         </label>
 
         <label class="field field-row">
-          <span class="field-label">라이어 수</span>
+          <span class="field-label">🤥 라이어 수</span>
           <div class="stepper">
             <button type="button" id="liar-minus" class="step-btn">−</button>
             <span id="liar-count">1</span>
@@ -44,13 +44,13 @@
         </label>
 
         <div class="field">
-          <span class="field-label">제시어 카테고리</span>
+          <span class="field-label">🗂️ 제시어 카테고리</span>
           <div id="category-list" class="chip-group"><!-- JS로 채움 --></div>
           <p id="cat-warning" class="warn-text hidden">카테고리를 하나 이상 골라줘! 🥺</p>
         </div>
 
         <div class="field">
-          <span class="field-label">게임 옵션</span>
+          <span class="field-label">⚙️ 게임 옵션</span>
           <label class="toggle">
             <input type="checkbox" id="opt-spy" />
             <span class="toggle-text">
@@ -104,16 +104,16 @@
 
       <div class="card-panel">
         <label class="field">
-          <span class="field-label">카테고리</span>
+          <span class="field-label">🗂️ 카테고리</span>
           <input id="edit-category" class="text-input" list="cat-options" placeholder="기존 선택 또는 새 카테고리 입력" />
           <datalist id="cat-options"></datalist>
         </label>
         <label class="field">
-          <span class="field-label">제시어 (시민 단어)</span>
+          <span class="field-label">💬 제시어 (시민 단어)</span>
           <input id="edit-word" class="text-input" placeholder="예: 사과" />
         </label>
         <label class="field">
-          <span class="field-label">스파이 단어 (선택)</span>
+          <span class="field-label">🕵️ 스파이 단어 (선택)</span>
           <input id="edit-spy" class="text-input" placeholder="비슷한 단어 (스파이 모드용)" />
         </label>
         <p id="edit-warning" class="warn-text hidden"></p>
@@ -125,7 +125,7 @@
 
       <div class="card-panel">
         <div class="field-label-row">
-          <span class="field-label">내가 추가한 단어</span>
+          <span class="field-label">📝 내가 추가한 단어</span>
           <button id="btn-clear-words" class="mini-btn">전체 삭제</button>
         </div>
         <div id="custom-list" class="custom-list"></div>
@@ -220,8 +220,8 @@
         <p class="result-meta">🏆 시민 <b id="result-score-citizens">0</b>승 · 라이어 <b id="result-score-liars">0</b>승 <span id="result-round"></span></p>
       </div>
       <div class="btn-row">
-        <button id="btn-replay" class="primary-btn">같은 설정으로 다시</button>
-        <button id="btn-home" class="primary-btn ghost">설정으로</button>
+        <button id="btn-replay" class="primary-btn">다시 하기 🔄</button>
+        <button id="btn-home" class="primary-btn ghost">처음으로 🏠</button>
       </div>
     </section>
 
