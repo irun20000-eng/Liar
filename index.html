@@ -68,10 +68,24 @@
               <small>설명·토론 시간을 잽니다 (기본 3분)</small>
             </span>
           </label>
+          <label class="toggle">
+            <input type="checkbox" id="opt-easy" />
+            <span class="toggle-text">
+              <strong>쉬움 모드 🐣</strong>
+              <small>라이어에게 주제(카테고리)를 살짝 알려줘요</small>
+            </span>
+          </label>
         </div>
       </div>
 
-      <button id="btn-start" class="primary-btn">게임 시작</button>
+      <div id="scoreboard" class="scoreboard hidden">
+        <span>🟢 시민 <b id="score-citizens">0</b></span>
+        <span>😈 라이어 <b id="score-liars">0</b></span>
+        <span>🎲 <b id="score-round">0</b>R</span>
+        <button type="button" id="btn-reset-score" class="mini-btn">초기화</button>
+      </div>
+
+      <button id="btn-start" class="primary-btn">게임 시작 🎈</button>
     </section>
 
     <!-- ===== 역할 확인 화면 (돌려쓰기) ===== -->
@@ -152,6 +166,8 @@
         <p class="result-meta">제시어: <b id="result-word"></b> <span id="result-category"></span></p>
         <p class="result-meta">라이어: <b id="result-liars"></b></p>
         <p id="result-spy" class="result-meta hidden"></p>
+        <hr class="result-divider" />
+        <p class="result-meta">🏆 시민 <b id="result-score-citizens">0</b>승 · 라이어 <b id="result-score-liars">0</b>승 <span id="result-round"></span></p>
       </div>
       <div class="btn-row">
         <button id="btn-replay" class="primary-btn">같은 설정으로 다시</button>

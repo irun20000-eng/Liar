@@ -4,6 +4,8 @@
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 12;
 const DEFAULT_TIMER = 180; // 3분
+const STORE_SETTINGS = "liar.settings.v1";
+const STORE_SCORE = "liar.score.v1";
 
 // ----- 설정 상태 -----
 const settings = {
@@ -13,11 +15,72 @@ const settings = {
   spyMode: false,
   comeback: true,
   timer: false,
+  easy: true, // 쉬움 모드: 라이어에게 카테고리 힌트 제공
 };
+
+// ----- 누적 점수판 -----
+const score = { citizens: 0, liars: 0, round: 0 };
 
 // ----- 진행 중 게임 상태 -----
 let game = null;
 let timerId = null;
+let lastWord = null; // 같은 단어 연속 출제 방지용
+
+// ===================================================================
+//  저장/불러오기 (localStorage)
+// ===================================================================
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(STORE_SETTINGS);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    // 저장된 값 중 유효한 항목만 반영
+    if (typeof saved.playerCount === "number")
+      settings.playerCount = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, saved.playerCount));
+    if (typeof saved.liarCount === "number") settings.liarCount = saved.liarCount;
+    if (Array.isArray(saved.categories)) settings.categories = saved.categories;
+    if (typeof saved.spyMode === "boolean") settings.spyMode = saved.spyMode;
+    if (typeof saved.comeback === "boolean") settings.comeback = saved.comeback;
+    if (typeof saved.timer === "boolean") settings.timer = saved.timer;
+    if (typeof saved.easy === "boolean") settings.easy = saved.easy;
+    // 더 이상 존재하지 않는 카테고리는 걸러내기
+    const valid = new Set(Object.keys(WORD_BANK));
+    settings.categories = settings.categories.filter((c) => valid.has(c));
+    settings.liarCount = Math.min(Math.max(1, settings.liarCount), settings.playerCount - 1);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(STORE_SETTINGS, JSON.stringify(settings));
+  } catch (e) {
+    /* 저장 불가(시크릿 모드 등)여도 게임은 계속 동작 */
+  }
+}
+
+function loadScore() {
+  try {
+    const raw = localStorage.getItem(STORE_SCORE);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (typeof s.citizens === "number") score.citizens = s.citizens;
+    if (typeof s.liars === "number") score.liars = s.liars;
+    if (typeof s.round === "number") score.round = s.round;
+  } catch (e) {
+    /* 무시 */
+  }
+}
+
+function saveScore() {
+  try {
+    localStorage.setItem(STORE_SCORE, JSON.stringify(score));
+  } catch (e) {
+    /* 무시 */
+  }
+}
 
 // ----- DOM 헬퍼 -----
 const $ = (sel) => document.querySelector(sel);
@@ -45,17 +108,22 @@ function pick(arr) {
 //  설정 화면
 // ===================================================================
 function initSetup() {
-  // 카테고리 칩 생성 (기본: 전부 선택)
+  const hadSaved = loadSettings();
+  loadScore();
+
+  // 카테고리 칩 생성 (저장된 선택 복원, 첫 실행이면 전부 선택)
   const catList = $("#category-list");
   catList.innerHTML = "";
   Object.keys(WORD_BANK).forEach((cat) => {
+    const selected = hadSaved ? settings.categories.includes(cat) : true;
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "chip selected";
+    chip.className = "chip" + (selected ? " selected" : "");
     chip.textContent = cat;
     chip.addEventListener("click", () => {
       chip.classList.toggle("selected");
       syncCategories();
+      saveSettings();
     });
     catList.appendChild(chip);
   });
@@ -67,14 +135,27 @@ function initSetup() {
   $("#liar-minus").addEventListener("click", () => changeLiars(-1));
   $("#liar-plus").addEventListener("click", () => changeLiars(1));
 
-  // 옵션
-  $("#opt-spy").addEventListener("change", (e) => (settings.spyMode = e.target.checked));
-  $("#opt-comeback").addEventListener("change", (e) => (settings.comeback = e.target.checked));
-  $("#opt-timer").addEventListener("change", (e) => (settings.timer = e.target.checked));
+  // 옵션 (저장된 값으로 체크 상태 복원)
+  bindToggle("#opt-spy", "spyMode");
+  bindToggle("#opt-comeback", "comeback");
+  bindToggle("#opt-timer", "timer");
+  bindToggle("#opt-easy", "easy");
 
   $("#btn-start").addEventListener("click", startGame);
+  $("#btn-reset-score").addEventListener("click", resetScore);
 
   renderCounts();
+  renderScoreboard();
+}
+
+function bindToggle(sel, key) {
+  const el = $(sel);
+  if (!el) return;
+  el.checked = settings[key];
+  el.addEventListener("change", (e) => {
+    settings[key] = e.target.checked;
+    saveSettings();
+  });
 }
 
 function syncCategories() {
@@ -90,17 +171,39 @@ function changePlayers(delta) {
   // 라이어 수는 항상 (플레이어 수 - 1) 이하
   settings.liarCount = Math.min(settings.liarCount, settings.playerCount - 1);
   renderCounts();
+  saveSettings();
 }
 
 function changeLiars(delta) {
   const maxLiars = settings.playerCount - 1;
   settings.liarCount = Math.min(maxLiars, Math.max(1, settings.liarCount + delta));
   renderCounts();
+  saveSettings();
 }
 
 function renderCounts() {
   $("#player-count").textContent = settings.playerCount;
   $("#liar-count").textContent = settings.liarCount;
+}
+
+// ===================================================================
+//  점수판
+// ===================================================================
+function renderScoreboard() {
+  const board = $("#scoreboard");
+  if (!board) return;
+  $("#score-citizens").textContent = score.citizens;
+  $("#score-liars").textContent = score.liars;
+  $("#score-round").textContent = score.round;
+  board.classList.toggle("hidden", score.round === 0);
+}
+
+function resetScore() {
+  score.citizens = 0;
+  score.liars = 0;
+  score.round = 0;
+  saveScore();
+  renderScoreboard();
 }
 
 // ===================================================================
@@ -121,7 +224,11 @@ function startGame() {
   if (warn) warn.classList.add("hidden");
 
   const category = pick(settings.categories);
-  const entry = pick(WORD_BANK[category]);
+  // 같은 단어 연속 출제 방지 (선택지가 2개 이상일 때 직전 단어는 다시 뽑지 않음)
+  const poolAll = WORD_BANK[category];
+  const pool = poolAll.filter((e) => e.word !== lastWord);
+  const entry = pick(pool.length > 0 ? pool : poolAll);
+  lastWord = entry.word;
 
   // 라이어 인덱스 선정
   const indices = shuffle([...Array(settings.playerCount).keys()]);
@@ -186,7 +293,9 @@ function renderRevealCard() {
     // 기본 모드 라이어
     $("#role-label").textContent = "🤫 당신은";
     $("#role-word").textContent = "라이어";
-    $("#role-desc").textContent = "제시어를 모릅니다. 들키지 않게 둘러대세요!";
+    $("#role-desc").textContent = settings.easy
+      ? `힌트! 주제는 "${game.category}" 예요.\n제시어는 모르니 눈치껏 둘러대세요!`
+      : "제시어를 모릅니다. 들키지 않게 둘러대세요!";
   } else if (p.isLiar) {
     // 스파이 모드 라이어
     $("#role-label").textContent = "🕵️ 당신의 단어 (스파이)";
@@ -351,6 +460,19 @@ function showResult(citizensWin, byComeback) {
   } else {
     spyEl.classList.add("hidden");
   }
+
+  // 누적 점수 갱신 (라운드당 한 번만)
+  if (!game.scored) {
+    game.scored = true;
+    score.round += 1;
+    if (citizensWin) score.citizens += 1;
+    else score.liars += 1;
+    saveScore();
+  }
+  $("#result-score-citizens").textContent = score.citizens;
+  $("#result-score-liars").textContent = score.liars;
+  $("#result-round").textContent = `· ${score.round}라운드`;
+  renderScoreboard();
 }
 
 function initResult() {

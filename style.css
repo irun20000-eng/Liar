@@ -153,7 +153,22 @@ body {
 .card-hint .big-emoji { display: block; font-size: 64px; margin-bottom: 8px; animation: bob 2s ease-in-out infinite; }
 .role-label { font-size: 20px; color: var(--ink-soft); }
 .role-word { font-size: 46px; color: var(--pink-deep); text-shadow: 2px 2px 0 #fff; }
-.role-desc { font-size: 15px; color: var(--ink-soft); line-height: 1.55; }
+.role-desc { font-size: 15px; color: var(--ink-soft); line-height: 1.55; white-space: pre-line; }
+
+/* ===== 점수판 ===== */
+.scoreboard {
+  display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+  background: #fff; border: 3px solid #ffe3ec; border-radius: 999px;
+  padding: 10px 14px; margin-bottom: 14px; font-size: 15px; color: var(--ink);
+  box-shadow: 0 5px 0 #ffe3ec;
+}
+.scoreboard b { color: var(--pink-deep); font-size: 18px; }
+.mini-btn {
+  border: none; background: var(--cream-2); color: var(--ink-soft);
+  font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+}
+.mini-btn:active { transform: scale(.92); }
+.result-divider { border: none; border-top: 2px dashed #ffd9e6; margin: 6px 0; }
 
 /* ===== 타이머 ===== */
 .timer { font-size: 60px; color: var(--sky); text-align: center; margin-bottom: 16px; font-variant-numeric: tabular-nums; text-shadow: 2px 3px 0 #fff; }
