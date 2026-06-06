@@ -40,6 +40,31 @@ body {
   padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== 떠다니는 배경 장식 ===== */
+.bg-decor { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bg-decor span {
+  position: absolute; font-size: 30px; opacity: .5;
+  animation: floaty linear infinite;
+}
+.bg-decor span:nth-child(1) { left: 6%;  top: 14%; font-size: 34px; animation-duration: 13s; }
+.bg-decor span:nth-child(2) { left: 84%; top: 10%; animation-duration: 17s; animation-delay: -3s; }
+.bg-decor span:nth-child(3) { left: 14%; top: 70%; font-size: 38px; animation-duration: 15s; animation-delay: -6s; }
+.bg-decor span:nth-child(4) { left: 78%; top: 64%; animation-duration: 19s; animation-delay: -2s; }
+.bg-decor span:nth-child(5) { left: 46%; top: 8%;  animation-duration: 16s; animation-delay: -9s; }
+.bg-decor span:nth-child(6) { left: 90%; top: 40%; font-size: 40px; animation-duration: 21s; animation-delay: -5s; }
+.bg-decor span:nth-child(7) { left: 4%;  top: 44%; animation-duration: 18s; animation-delay: -11s; }
+.bg-decor span:nth-child(8) { left: 60%; top: 84%; animation-duration: 14s; animation-delay: -1s; }
+@keyframes floaty {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-26px) rotate(12deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bg-decor span, .title h1, .timer.warn, .card-hint .big-emoji { animation: none !important; }
 }
 
 /* ===== 화면 전환 ===== */
@@ -145,10 +170,23 @@ body {
   backface-visibility: hidden; transition: transform .55s cubic-bezier(.34,1.4,.64,1);
   box-shadow: 0 12px 0 #00000012, 0 16px 30px #00000018; border: 4px solid #fff;
 }
-.card-front { background: linear-gradient(160deg, #ffd1e3, #ffb6cf); transform: rotateY(0deg); }
+.card-front { background: linear-gradient(160deg, #ffd1e3, #ffb6cf); transform: rotateY(0deg); overflow: hidden; }
 .card-back { background: linear-gradient(160deg, #fff6ef, #ffe9d6); transform: rotateY(180deg); }
 .role-card.flipped .card-front { transform: rotateY(-180deg); }
 .role-card.flipped .card-back { transform: rotateY(0deg); }
+/* 앞면 반짝임 sweep */
+.card-front::after {
+  content: ""; position: absolute; top: -60%; left: -40%; width: 50%; height: 220%;
+  background: linear-gradient(90deg, transparent, #ffffff88, transparent);
+  transform: rotate(18deg); animation: shine 3.2s ease-in-out infinite;
+}
+@keyframes shine { 0%, 70% { left: -40%; } 100% { left: 130%; } }
+/* 역할별 카드 색상 */
+.role-card.role-citizen .card-back { background: linear-gradient(160deg, #c3f7e7, #8fe3c9); }
+.role-card.role-liar .card-back { background: linear-gradient(160deg, #ffc6d8, #ff9bb6); }
+.role-card.role-spy .card-back { background: linear-gradient(160deg, #e7d6ff, #c4a7ff); }
+.role-card.role-citizen .role-word { color: #15795e; }
+.role-card.role-spy .role-word { color: #6b3fb8; }
 .card-hint { font-size: 22px; color: var(--pink-deep); }
 .card-hint .big-emoji { display: block; font-size: 64px; margin-bottom: 8px; animation: bob 2s ease-in-out infinite; }
 .role-label { font-size: 20px; color: var(--ink-soft); }
@@ -198,6 +236,48 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .icon-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #ffe3ec; }
+
+/* ===== 결과 화면 연출 ===== */
+#screen-result { position: relative; }
+#screen-result.win #result-title { animation: titlePop .6s cubic-bezier(.34,1.7,.5,1) both; }
+#screen-result.lose #result-title { animation: titleSad .6s ease both; }
+@keyframes titlePop { 0% { transform: scale(.3) rotate(-12deg); opacity: 0; } 60% { transform: scale(1.15) rotate(4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes titleSad { 0% { transform: translateY(-14px); opacity: 0; } 60% { transform: translateY(4px); } 100% { transform: translateY(0); opacity: 1; } }
+
+/* 컨페티 (승리 시에만 재생) */
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; opacity: 0; }
+#screen-result.win .confetti { opacity: 1; }
+.confetti span {
+  position: absolute; top: -24px; width: 11px; height: 16px; border-radius: 3px; opacity: 0;
+}
+#screen-result.win .confetti span { animation: drop 2.4s ease-in infinite; }
+.confetti span:nth-child(1)  { left: 8%;  background: #ff8fb1; animation-delay: 0s;   }
+.confetti span:nth-child(2)  { left: 18%; background: #ffe27a; animation-delay: .25s; }
+.confetti span:nth-child(3)  { left: 28%; background: #8fd0ff; animation-delay: .5s;  }
+.confetti span:nth-child(4)  { left: 38%; background: #7fe0c3; animation-delay: .15s; }
+.confetti span:nth-child(5)  { left: 48%; background: #c4a7ff; animation-delay: .65s; }
+.confetti span:nth-child(6)  { left: 58%; background: #ff8fb1; animation-delay: .35s; }
+.confetti span:nth-child(7)  { left: 68%; background: #ffe27a; animation-delay: .8s;  }
+.confetti span:nth-child(8)  { left: 78%; background: #8fd0ff; animation-delay: .1s;  }
+.confetti span:nth-child(9)  { left: 88%; background: #7fe0c3; animation-delay: .55s; }
+.confetti span:nth-child(10) { left: 14%; background: #c4a7ff; animation-delay: .9s;  }
+.confetti span:nth-child(11) { left: 52%; background: #ff8fb1; animation-delay: 1.1s; }
+.confetti span:nth-child(12) { left: 74%; background: #ffe27a; animation-delay: 1.3s; }
+@keyframes drop {
+  0%   { transform: translateY(0) rotate(0); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { transform: translateY(108vh) rotate(540deg); opacity: 1; }
+}
+
+/* ===== 미세 인터랙션 ===== */
+.chip.selected { animation: chipPop .25s ease; }
+@keyframes chipPop { 0% { transform: scale(.9); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+#btn-start { animation: breathe 2.6s ease-in-out infinite; }
+#btn-start:active { animation: none; }
+@keyframes breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .card-front::after, .confetti span, #btn-start, #result-title { animation: none !important; }
+}
 
 /* ===== 타이머 ===== */
 .timer { font-size: 60px; color: var(--sky); text-align: center; margin-bottom: 16px; font-variant-numeric: tabular-nums; text-shadow: 2px 3px 0 #fff; }

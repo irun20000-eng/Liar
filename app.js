@@ -358,6 +358,9 @@ function renderRevealCard() {
   const card = $("#role-card");
 
   card.classList.remove("flipped");
+  // 역할별 카드 색상 클래스 초기화 후 지정
+  card.classList.remove("role-citizen", "role-liar", "role-spy");
+  card.classList.add(!p.isLiar ? "role-citizen" : p.word === null ? "role-liar" : "role-spy");
   $("#btn-reveal-next").classList.add("hidden");
   $("#reveal-progress").textContent = `${i + 1} / ${game.players.length}`;
   $("#reveal-handoff").textContent = `${p.name}, 폰을 받으세요`;
@@ -514,6 +517,11 @@ function showResult(citizensWin, byComeback) {
   showScreen("screen-result");
 
   const liarNames = game.players.filter((p) => p.isLiar).map((p) => p.name).join(", ");
+
+  // 승패에 따른 연출 (컨페티/색상)
+  const resultScreen = $("#screen-result");
+  resultScreen.classList.toggle("win", citizensWin);
+  resultScreen.classList.toggle("lose", !citizensWin);
 
   if (citizensWin) {
     $("#result-title").textContent = "🎉 시민 승리!";
