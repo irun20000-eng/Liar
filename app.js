@@ -79,6 +79,10 @@ function initSetup() {
 
 function syncCategories() {
   settings.categories = $$("#category-list .chip.selected").map((c) => c.textContent);
+  if (settings.categories.length > 0) {
+    const warn = $("#cat-warning");
+    if (warn) warn.classList.add("hidden");
+  }
 }
 
 function changePlayers(delta) {
@@ -104,9 +108,17 @@ function renderCounts() {
 // ===================================================================
 function startGame() {
   if (settings.categories.length === 0) {
-    alert("카테고리를 하나 이상 선택해주세요!");
+    const warn = $("#cat-warning");
+    if (warn) {
+      warn.classList.remove("hidden");
+      warn.classList.remove("shake");
+      void warn.offsetWidth; // 리플로우로 애니메이션 재시작
+      warn.classList.add("shake");
+    }
     return;
   }
+  const warn = $("#cat-warning");
+  if (warn) warn.classList.add("hidden");
 
   const category = pick(settings.categories);
   const entry = pick(WORD_BANK[category]);

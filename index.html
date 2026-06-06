@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#1a1a2e" />
-  <title>라이어 게임</title>
+  <meta name="theme-color" content="#ff8fb1" />
+  <title>🎭 라이어 게임</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -14,11 +17,11 @@
     <section id="screen-setup" class="screen active">
       <header class="title">
         <h1>🎭 라이어 게임</h1>
-        <p class="subtitle">한 기기로 함께 즐기는 추리 게임</p>
+        <p class="subtitle">온 가족이 함께 즐기는 추리 게임 🐥</p>
       </header>
 
       <div class="card-panel">
-        <label class="field">
+        <label class="field field-row">
           <span class="field-label">플레이어 수</span>
           <div class="stepper">
             <button type="button" id="player-minus" class="step-btn">−</button>
@@ -27,7 +30,7 @@
           </div>
         </label>
 
-        <label class="field">
+        <label class="field field-row">
           <span class="field-label">라이어 수</span>
           <div class="stepper">
             <button type="button" id="liar-minus" class="step-btn">−</button>
@@ -39,6 +42,7 @@
         <div class="field">
           <span class="field-label">제시어 카테고리</span>
           <div id="category-list" class="chip-group"><!-- JS로 채움 --></div>
+          <p id="cat-warning" class="warn-text hidden">카테고리를 하나 이상 골라줘! 🥺</p>
         </div>
 
         <div class="field">
@@ -78,7 +82,7 @@
 
         <div id="role-card" class="role-card">
           <div class="card-face card-front">
-            <span class="card-hint">👆 탭해서 내 역할 확인</span>
+            <span class="card-hint"><span class="big-emoji">🍬</span>콕! 눌러서 확인하기</span>
           </div>
           <div class="card-face card-back">
             <span id="role-label" class="role-label"></span>
@@ -87,7 +91,7 @@
           </div>
         </div>
 
-        <button id="btn-reveal-next" class="primary-btn hidden">확인했어요, 넘기기</button>
+        <button id="btn-reveal-next" class="primary-btn hidden">확인했어요! 다음 사람에게 👉</button>
       </div>
     </section>
 
