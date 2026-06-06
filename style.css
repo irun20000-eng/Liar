@@ -1,0 +1,149 @@
+:root {
+  --bg: #1a1a2e;
+  --bg-soft: #24243e;
+  --panel: #2d2d44;
+  --accent: #e94560;
+  --accent-2: #5372f0;
+  --text: #f5f5fa;
+  --muted: #a0a0c0;
+  --good: #2ecc71;
+  --radius: 16px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 0%, #2a2a4a 0%, var(--bg) 60%);
+}
+
+#app {
+  width: 100%;
+  max-width: 460px;
+  min-height: 100dvh;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== 화면 전환 ===== */
+.screen { display: none; flex-direction: column; flex: 1; animation: fade .3s ease; }
+.screen.active { display: flex; }
+@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ===== 타이틀 ===== */
+.title { text-align: center; margin-bottom: 20px; }
+.title h1 { font-size: 28px; font-weight: 800; }
+.subtitle { color: var(--muted); margin-top: 6px; font-size: 14px; }
+
+/* ===== 패널 / 필드 ===== */
+.card-panel {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.field { display: flex; flex-direction: column; gap: 10px; }
+.field-label { font-size: 14px; font-weight: 700; color: var(--muted); }
+
+/* ===== 스테퍼 ===== */
+.field > .stepper { align-self: flex-start; }
+.field:has(.stepper) { flex-direction: row; align-items: center; justify-content: space-between; }
+.stepper { display: flex; align-items: center; gap: 18px; }
+.stepper span { font-size: 22px; font-weight: 800; min-width: 28px; text-align: center; }
+.step-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: none; background: var(--bg-soft); color: var(--text);
+  font-size: 24px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.step-btn:active { background: var(--accent); }
+
+/* ===== 칩 (카테고리/투표) ===== */
+.chip-group { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--bg-soft); color: var(--muted);
+  border: 2px solid transparent; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.chip.selected { background: var(--accent-2); color: #fff; border-color: #fff3; }
+.vote-group { flex-direction: column; }
+.vote-group .chip { width: 100%; text-align: center; padding: 16px; font-size: 16px; }
+.vote-group .chip.selected { background: var(--accent); }
+
+/* ===== 토글 ===== */
+.toggle { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+.toggle input { appearance: none; width: 48px; height: 28px; border-radius: 999px;
+  background: var(--bg-soft); position: relative; flex-shrink: 0; transition: background .2s; cursor: pointer; }
+.toggle input::after { content: ""; position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.toggle input:checked { background: var(--good); }
+.toggle input:checked::after { transform: translateX(20px); }
+.toggle-text { display: flex; flex-direction: column; }
+.toggle-text strong { font-size: 15px; }
+.toggle-text small { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* ===== 버튼 ===== */
+.primary-btn {
+  margin-top: auto; padding: 18px; border: none; border-radius: var(--radius);
+  background: var(--accent); color: #fff; font-size: 17px; font-weight: 800;
+  cursor: pointer; transition: transform .1s, opacity .2s; width: 100%;
+}
+.primary-btn:active { transform: scale(0.98); }
+.primary-btn:disabled { opacity: .4; cursor: not-allowed; }
+.primary-btn.ghost { background: transparent; border: 2px solid var(--muted); color: var(--muted); }
+.primary-btn.danger { background: var(--accent-2); }
+.btn-row { display: flex; gap: 12px; margin-top: auto; }
+.btn-row .primary-btn { margin-top: 0; }
+.hidden { display: none !important; }
+
+/* ===== 역할 확인 ===== */
+.reveal-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; }
+.progress-text { color: var(--muted); font-size: 14px; }
+#reveal-handoff { font-size: 22px; font-weight: 800; }
+.role-card { width: 100%; max-width: 320px; aspect-ratio: 3 / 4; perspective: 1200px; cursor: pointer; }
+.card-face {
+  position: absolute; inset: 0; border-radius: 22px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 24px; text-align: center;
+  backface-visibility: hidden; transition: transform .5s; box-shadow: 0 12px 30px #0006;
+}
+.role-card { position: relative; }
+.card-front { background: linear-gradient(145deg, var(--accent-2), #3a4ed0); transform: rotateY(0deg); }
+.card-back { background: linear-gradient(145deg, var(--panel), var(--bg-soft)); transform: rotateY(180deg); }
+.role-card.flipped .card-front { transform: rotateY(-180deg); }
+.role-card.flipped .card-back { transform: rotateY(0deg); }
+.card-hint { font-size: 18px; font-weight: 700; }
+.role-label { font-size: 20px; font-weight: 800; color: var(--muted); }
+.role-word { font-size: 40px; font-weight: 900; }
+.role-desc { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+/* ===== 타이머 ===== */
+.timer { font-size: 56px; font-weight: 900; text-align: center; margin-bottom: 18px; font-variant-numeric: tabular-nums; }
+.timer.warn { color: var(--accent); }
+
+/* ===== 토론 규칙 ===== */
+.rule-list { padding-left: 20px; display: flex; flex-direction: column; gap: 10px; line-height: 1.5; font-size: 15px; }
+.rule-list b { color: var(--accent); }
+
+/* ===== 텍스트 ===== */
+.big-text { font-size: 20px; font-weight: 700; line-height: 1.6; text-align: center; }
+.big-text b { color: var(--accent); }
+.hint-text { color: var(--muted); text-align: center; margin-top: 12px; font-size: 14px; }
+.result-meta { font-size: 16px; line-height: 2; }
+.result-meta b { color: var(--accent); }
+#result-title { font-size: 30px; }

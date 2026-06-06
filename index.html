@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <title>라이어 게임</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===== 설정 화면 ===== -->
+    <section id="screen-setup" class="screen active">
+      <header class="title">
+        <h1>🎭 라이어 게임</h1>
+        <p class="subtitle">한 기기로 함께 즐기는 추리 게임</p>
+      </header>
+
+      <div class="card-panel">
+        <label class="field">
+          <span class="field-label">플레이어 수</span>
+          <div class="stepper">
+            <button type="button" id="player-minus" class="step-btn">−</button>
+            <span id="player-count">4</span>
+            <button type="button" id="player-plus" class="step-btn">+</button>
+          </div>
+        </label>
+
+        <label class="field">
+          <span class="field-label">라이어 수</span>
+          <div class="stepper">
+            <button type="button" id="liar-minus" class="step-btn">−</button>
+            <span id="liar-count">1</span>
+            <button type="button" id="liar-plus" class="step-btn">+</button>
+          </div>
+        </label>
+
+        <div class="field">
+          <span class="field-label">제시어 카테고리</span>
+          <div id="category-list" class="chip-group"><!-- JS로 채움 --></div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">게임 옵션</span>
+          <label class="toggle">
+            <input type="checkbox" id="opt-spy" />
+            <span class="toggle-text">
+              <strong>스파이 모드</strong>
+              <small>라이어가 비슷한 다른 단어를 받습니다</small>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="opt-comeback" checked />
+            <span class="toggle-text">
+              <strong>라이어 역전 기회</strong>
+              <small>지목된 라이어가 제시어를 맞히면 역전승</small>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="opt-timer" />
+            <span class="toggle-text">
+              <strong>토론 타이머</strong>
+              <small>설명·토론 시간을 잽니다 (기본 3분)</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <button id="btn-start" class="primary-btn">게임 시작</button>
+    </section>
+
+    <!-- ===== 역할 확인 화면 (돌려쓰기) ===== -->
+    <section id="screen-reveal" class="screen">
+      <div class="reveal-wrap">
+        <p id="reveal-progress" class="progress-text"></p>
+        <h2 id="reveal-handoff">플레이어 1, 폰을 받으세요</h2>
+
+        <div id="role-card" class="role-card">
+          <div class="card-face card-front">
+            <span class="card-hint">👆 탭해서 내 역할 확인</span>
+          </div>
+          <div class="card-face card-back">
+            <span id="role-label" class="role-label"></span>
+            <span id="role-word" class="role-word"></span>
+            <span id="role-desc" class="role-desc"></span>
+          </div>
+        </div>
+
+        <button id="btn-reveal-next" class="primary-btn hidden">확인했어요, 넘기기</button>
+      </div>
+    </section>
+
+    <!-- ===== 토론 화면 ===== -->
+    <section id="screen-discuss" class="screen">
+      <header class="title">
+        <h1>🗣️ 토론 시간</h1>
+        <p class="subtitle">돌아가며 제시어를 설명하고, 라이어를 찾으세요!</p>
+      </header>
+      <div id="timer-display" class="timer hidden">3:00</div>
+      <div class="card-panel">
+        <ol class="rule-list">
+          <li>순서대로 제시어에 대해 <b>한 마디씩</b> 설명해요.</li>
+          <li>너무 정확히 말하면 라이어에게 힌트가 돼요.</li>
+          <li>너무 모호하면 의심받아요. 적당히!</li>
+          <li>충분히 토론했다면 투표로 넘어가세요.</li>
+        </ol>
+      </div>
+      <button id="btn-to-vote" class="primary-btn">투표하러 가기</button>
+    </section>
+
+    <!-- ===== 투표 화면 ===== -->
+    <section id="screen-vote" class="screen">
+      <header class="title">
+        <h1>🗳️ 투표</h1>
+        <p class="subtitle">가장 의심스러운 사람을 지목하세요</p>
+      </header>
+      <div id="vote-list" class="chip-group vote-group"><!-- JS로 채움 --></div>
+      <button id="btn-reveal-result" class="primary-btn" disabled>결과 공개</button>
+    </section>
+
+    <!-- ===== 라이어 역전 화면 ===== -->
+    <section id="screen-comeback" class="screen">
+      <header class="title">
+        <h1>🔥 라이어 역전 기회!</h1>
+      </header>
+      <div class="card-panel">
+        <p class="big-text">지목된 라이어 <b id="comeback-name"></b> 님,<br />제시어가 무엇이었을까요?</p>
+        <p class="hint-text">정답을 말한 뒤 아래 버튼을 누르세요.</p>
+      </div>
+      <button id="btn-comeback-show" class="primary-btn">정답 단어 공개</button>
+      <div id="comeback-answer" class="hidden">
+        <p class="big-text">정답은 <b id="comeback-word"></b> 였습니다.</p>
+        <p class="hint-text">라이어가 맞혔나요?</p>
+        <div class="btn-row">
+          <button id="btn-comeback-yes" class="primary-btn danger">맞힘 (라이어 승)</button>
+          <button id="btn-comeback-no" class="primary-btn">못 맞힘 (시민 승)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 결과 화면 ===== -->
+    <section id="screen-result" class="screen">
+      <header class="title">
+        <h1 id="result-title"></h1>
+      </header>
+      <div class="card-panel">
+        <p class="result-meta">제시어: <b id="result-word"></b> <span id="result-category"></span></p>
+        <p class="result-meta">라이어: <b id="result-liars"></b></p>
+        <p id="result-spy" class="result-meta hidden"></p>
+      </div>
+      <div class="btn-row">
+        <button id="btn-replay" class="primary-btn">같은 설정으로 다시</button>
+        <button id="btn-home" class="primary-btn ghost">설정으로</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
