@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#ff8fb1" />
+  <meta name="theme-color" content="#e15b7a" />
   <title>🎭 라이어 게임</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AD%3C/text%3E%3C/svg%3E" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -12,6 +12,8 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="라이어 게임" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
@@ -28,12 +30,12 @@
     <section id="screen-setup" class="screen active">
       <header class="title">
         <h1>🎭 라이어 게임</h1>
-        <p class="subtitle">온 가족이 함께 즐기는 추리 게임 🐥</p>
+        <p class="subtitle">온 가족이 함께 즐기는 추리 게임</p>
       </header>
 
       <div class="card-panel">
         <label class="field field-row">
-          <span class="field-label">👥 플레이어 수</span>
+          <span class="field-label">플레이어 수</span>
           <div class="stepper">
             <button type="button" id="player-minus" class="step-btn">−</button>
             <span id="player-count">4</span>
@@ -42,7 +44,7 @@
         </label>
 
         <label class="field field-row">
-          <span class="field-label">🤥 라이어 수</span>
+          <span class="field-label">라이어 수</span>
           <div class="stepper">
             <button type="button" id="liar-minus" class="step-btn">−</button>
             <span id="liar-count">1</span>
@@ -51,18 +53,18 @@
         </label>
 
         <div class="field">
-          <span class="field-label">🙋 플레이어 이름</span>
+          <span class="field-label">플레이어 이름</span>
           <div id="name-list" class="name-list"><!-- JS로 채움 --></div>
         </div>
 
         <div class="field">
-          <span class="field-label">🗂️ 제시어 카테고리</span>
+          <span class="field-label">제시어 카테고리</span>
           <div id="category-list" class="chip-group"><!-- JS로 채움 --></div>
-          <p id="cat-warning" class="warn-text hidden">카테고리를 하나 이상 골라줘! 🥺</p>
+          <p id="cat-warning" class="warn-text hidden">카테고리를 하나 이상 선택해 주세요</p>
         </div>
 
         <div class="field">
-          <span class="field-label">⚙️ 게임 옵션</span>
+          <span class="field-label">게임 옵션</span>
           <label class="toggle">
             <input type="checkbox" id="opt-spy" />
             <span class="toggle-text">
@@ -87,23 +89,28 @@
           <label class="toggle">
             <input type="checkbox" id="opt-easy" />
             <span class="toggle-text">
-              <strong>쉬움 모드 🐣</strong>
+              <strong>쉬움 모드</strong>
               <small>라이어에게 주제(카테고리)를 살짝 알려줘요</small>
             </span>
           </label>
         </div>
+
+        <div class="field">
+          <span class="field-label">테마</span>
+          <div id="theme-list" class="theme-list"><!-- JS로 채움 --></div>
+        </div>
       </div>
 
       <div id="scoreboard" class="scoreboard hidden">
-        <span>🟢 시민 <b id="score-citizens">0</b></span>
-        <span>😈 라이어 <b id="score-liars">0</b></span>
-        <span>🎲 <b id="score-round">0</b>R</span>
+        <span>시민 <b id="score-citizens">0</b></span>
+        <span>라이어 <b id="score-liars">0</b></span>
+        <span>라운드 <b id="score-round">0</b></span>
         <button type="button" id="btn-reset-score" class="mini-btn">초기화</button>
       </div>
 
       <div class="setup-actions">
-        <button id="btn-edit-words" class="primary-btn ghost">✏️ 제시어 편집</button>
-        <button id="btn-start" class="primary-btn">게임 시작 🎈</button>
+        <button id="btn-edit-words" class="primary-btn ghost">제시어 편집</button>
+        <button id="btn-start" class="primary-btn">게임 시작</button>
       </div>
     </section>
 
@@ -111,21 +118,21 @@
     <section id="screen-editor" class="screen">
       <header class="title">
         <h1>✏️ 제시어 편집</h1>
-        <p class="subtitle">우리 가족만의 단어를 추가해요 🐥</p>
+        <p class="subtitle">우리 가족만의 단어를 추가해요</p>
       </header>
 
       <div class="card-panel">
         <label class="field">
-          <span class="field-label">🗂️ 카테고리</span>
+          <span class="field-label">카테고리</span>
           <input id="edit-category" class="text-input" list="cat-options" placeholder="기존 선택 또는 새 카테고리 입력" />
           <datalist id="cat-options"></datalist>
         </label>
         <label class="field">
-          <span class="field-label">💬 제시어 (시민 단어)</span>
+          <span class="field-label">제시어 (시민 단어)</span>
           <input id="edit-word" class="text-input" placeholder="예: 사과" />
         </label>
         <label class="field">
-          <span class="field-label">🕵️ 스파이 단어 (선택)</span>
+          <span class="field-label">스파이 단어 (선택)</span>
           <input id="edit-spy" class="text-input" placeholder="비슷한 단어 (스파이 모드용)" />
         </label>
         <p id="edit-warning" class="warn-text hidden"></p>
@@ -137,19 +144,19 @@
 
       <div class="card-panel">
         <div class="field-label-row">
-          <span class="field-label">📝 내가 추가한 단어</span>
+          <span class="field-label">내가 추가한 단어</span>
           <button id="btn-clear-words" class="mini-btn">전체 삭제</button>
         </div>
         <div id="custom-list" class="custom-list"></div>
         <div class="editor-io">
-          <button type="button" id="btn-export" class="primary-btn ghost small-btn">📤 내보내기</button>
-          <button type="button" id="btn-import" class="primary-btn ghost small-btn">📥 가져오기</button>
+          <button type="button" id="btn-export" class="primary-btn ghost small-btn">내보내기</button>
+          <button type="button" id="btn-import" class="primary-btn ghost small-btn">가져오기</button>
           <input type="file" id="import-file" accept="application/json,.json" hidden />
         </div>
         <p id="io-msg" class="warn-text hidden"></p>
       </div>
 
-      <button id="btn-editor-back" class="primary-btn">설정으로 돌아가기 🏠</button>
+      <button id="btn-editor-back" class="primary-btn">설정으로 돌아가기</button>
     </section>
 
     <!-- ===== 역할 확인 화면 (돌려쓰기) ===== -->
@@ -160,7 +167,7 @@
 
         <div id="role-card" class="role-card">
           <div class="card-face card-front">
-            <span class="card-hint"><span class="big-emoji">🍬</span>콕! 눌러서 확인하기</span>
+            <span class="card-hint"><span class="big-emoji">👆</span>카드를 탭하세요</span>
           </div>
           <div class="card-face card-back">
             <span id="role-label" class="role-label"></span>
@@ -169,7 +176,7 @@
           </div>
         </div>
 
-        <button id="btn-reveal-next" class="primary-btn hidden">확인했어요! 다음 사람에게 👉</button>
+        <button id="btn-reveal-next" class="primary-btn hidden">확인했어요 · 다음 사람에게</button>
       </div>
     </section>
 
@@ -235,11 +242,11 @@
         <p class="result-meta">라이어: <b id="result-liars"></b></p>
         <p id="result-spy" class="result-meta hidden"></p>
         <hr class="result-divider" />
-        <p class="result-meta">🏆 시민 <b id="result-score-citizens">0</b>승 · 라이어 <b id="result-score-liars">0</b>승 <span id="result-round"></span></p>
+        <p class="result-meta">시민 <b id="result-score-citizens">0</b>승 · 라이어 <b id="result-score-liars">0</b>승 <span id="result-round"></span></p>
       </div>
       <div class="btn-row">
-        <button id="btn-replay" class="primary-btn">다시 하기 🔄</button>
-        <button id="btn-home" class="primary-btn ghost">처음으로 🏠</button>
+        <button id="btn-replay" class="primary-btn">다시 하기</button>
+        <button id="btn-home" class="primary-btn ghost">처음으로</button>
       </div>
     </section>
 

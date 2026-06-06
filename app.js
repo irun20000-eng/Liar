@@ -18,7 +18,20 @@ const settings = {
   timer: false,
   easy: true, // 쉬움 모드: 라이어에게 카테고리 힌트 제공
   playerNames: ["아빠", "엄마", "예예", "두지", "토리"], // 기본 닉네임
+  theme: "rose", // 색 테마
 };
+
+// 선택 가능한 테마 (가족별 색상 + 다크모드)
+const THEMES = [
+  { id: "candy", name: "캔디", color: "#ff8fb1" },   // 초기 귀염폭발 버전
+  { id: "rose", name: "로즈", color: "#e15b7a" },    // 세련 기본
+  { id: "navy", name: "네이비", color: "#2f4a73" },
+  { id: "beige", name: "베이지", color: "#b9745f" },
+  { id: "mono", name: "모노", color: "#1c1c1f" },
+  { id: "mood", name: "무드", color: "#5a7184" },
+  { id: "pastel", name: "파스텔", color: "#a87fe0" },
+  { id: "dark", name: "다크", color: "#2a2a32" },
+];
 
 // ----- 누적 점수판 -----
 const score = { citizens: 0, liars: 0, round: 0 };
@@ -63,6 +76,8 @@ function loadSettings() {
     if (typeof saved.easy === "boolean") settings.easy = saved.easy;
     if (Array.isArray(saved.playerNames))
       settings.playerNames = saved.playerNames.map((n) => (typeof n === "string" ? n : "")).slice(0, MAX_PLAYERS);
+    if (typeof saved.theme === "string" && THEMES.some((t) => t.id === saved.theme))
+      settings.theme = saved.theme;
     // 더 이상 존재하지 않는 카테고리는 걸러내기
     const valid = new Set(Object.keys(WORD_BANK));
     settings.categories = settings.categories.filter((c) => valid.has(c));
@@ -164,6 +179,10 @@ function initSetup() {
   loadScore();
   loadCustom();
 
+  // 테마 적용 + 선택 UI
+  applyTheme(settings.theme);
+  renderThemePicker();
+
   // 첫 실행이면 모든 카테고리 선택
   if (!hadSaved) settings.categories = Object.keys(getBank());
   renderCategoryChips();
@@ -207,6 +226,45 @@ function renderCategoryChips() {
     catList.appendChild(chip);
   });
   syncCategories();
+}
+
+// 테마 적용 (html data-theme + 주소창 색)
+function applyTheme(id) {
+  const theme = THEMES.find((t) => t.id === id) || THEMES[0];
+  document.documentElement.setAttribute("data-theme", theme.id);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", theme.id === "dark" ? "#1b1b21" : theme.color);
+}
+
+function renderThemePicker() {
+  const list = $("#theme-list");
+  if (!list) return;
+  list.innerHTML = "";
+  THEMES.forEach((t) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "theme-swatch" + (settings.theme === t.id ? " selected" : "");
+    btn.setAttribute("aria-label", t.name);
+
+    const dot = document.createElement("span");
+    dot.className = "theme-dot";
+    dot.style.background = t.color;
+
+    const name = document.createElement("span");
+    name.className = "theme-name";
+    name.textContent = t.name;
+
+    btn.appendChild(dot);
+    btn.appendChild(name);
+    btn.addEventListener("click", () => {
+      settings.theme = t.id;
+      applyTheme(t.id);
+      saveSettings();
+      $$("#theme-list .theme-swatch").forEach((s) => s.classList.remove("selected"));
+      btn.classList.add("selected");
+    });
+    list.appendChild(btn);
+  });
 }
 
 function bindToggle(sel, key) {
@@ -311,7 +369,7 @@ function startGame() {
   if (settings.categories.length === 0) {
     const warn = $("#cat-warning");
     if (warn) {
-      warn.textContent = "카테고리를 하나 이상 골라줘! 🥺";
+      warn.textContent = "카테고리를 하나 이상 선택해 주세요";
       warn.classList.remove("hidden");
       warn.classList.remove("shake");
       void warn.offsetWidth; // 리플로우로 애니메이션 재시작
@@ -328,7 +386,7 @@ function startGame() {
   if (usable.length === 0) {
     const warn = $("#cat-warning");
     if (warn) {
-      warn.textContent = "선택한 카테고리에 단어가 없어요 🥺";
+      warn.textContent = "선택한 카테고리에 단어가 없어요";
       warn.classList.remove("hidden");
     }
     return;
