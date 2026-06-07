@@ -20,6 +20,7 @@ const settings = {
   playerNames: ["아빠", "엄마", "예예", "두지", "토리"], // 기본 닉네임
   theme: "rose", // 색 테마
   sound: true, // 효과음 + 진동
+  seenCats: [], // 사용자가 이미 본 기본 카테고리 (새 팩 자동 활성화용)
 };
 
 // 선택 가능한 테마 (가족별 색상 + 다크모드)
@@ -80,6 +81,7 @@ function loadSettings() {
     if (typeof saved.theme === "string" && THEMES.some((t) => t.id === saved.theme))
       settings.theme = saved.theme;
     if (typeof saved.sound === "boolean") settings.sound = saved.sound;
+    if (Array.isArray(saved.seenCats)) settings.seenCats = saved.seenCats.filter((c) => typeof c === "string");
     // 더 이상 존재하지 않는 카테고리는 걸러내기
     const valid = new Set(Object.keys(WORD_BANK));
     settings.categories = settings.categories.filter((c) => valid.has(c));
@@ -238,8 +240,16 @@ function initSetup() {
   applyTheme(settings.theme);
   renderThemePicker();
 
+  // 새로 추가된 기본 팩은 자동으로 켜기 (최초 노출 시 1회)
+  Object.keys(WORD_BANK).forEach((c) => {
+    if (!settings.seenCats.includes(c)) {
+      settings.seenCats.push(c);
+      if (hadSaved && !settings.categories.includes(c)) settings.categories.push(c);
+    }
+  });
   // 첫 실행이면 모든 카테고리 선택
   if (!hadSaved) settings.categories = Object.keys(getBank());
+  saveSettings();
   renderCategoryChips();
 
   // 스테퍼
