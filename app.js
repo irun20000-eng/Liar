@@ -764,20 +764,58 @@ function resolveResult() {
 }
 
 function initComeback() {
-  $("#btn-comeback-show").addEventListener("click", () => {
-    $("#comeback-word").textContent = game.word;
-    $("#btn-comeback-show").classList.add("hidden");
-    $("#comeback-answer").classList.remove("hidden");
-  });
-  $("#btn-comeback-yes").addEventListener("click", () => showResult(false, true)); // 라이어 역전승
-  $("#btn-comeback-no").addEventListener("click", () => showResult(true, false));  // 시민 승
+  // 후보 버튼은 startComeback에서 동적으로 생성/바인딩
 }
 
 function startComeback(votedLiar) {
   showScreen("screen-comeback");
+  game.comebackDone = false;
   $("#comeback-name").textContent = votedLiar.name;
-  $("#btn-comeback-show").classList.remove("hidden");
-  $("#comeback-answer").classList.add("hidden");
+  const msg = $("#comeback-result");
+  msg.classList.add("hidden");
+  msg.textContent = "";
+
+  // 후보 구성: 정답 1개 + 오답 9개 (같은 카테고리 우선, 부족하면 다른 카테고리)
+  const bank = getBank();
+  let pool = (bank[game.category] || []).map((e) => e.word).filter((w) => w !== game.word);
+  if (pool.length < 9) {
+    const all = [];
+    Object.values(bank).forEach((arr) => arr.forEach((e) => { if (e.word !== game.word) all.push(e.word); }));
+    pool = pool.concat(all);
+  }
+  pool = [...new Set(pool)];
+  const options = shuffle([game.word, ...shuffle(pool).slice(0, 9)]);
+
+  const box = $("#comeback-options");
+  box.innerHTML = "";
+  options.forEach((w) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "comeback-opt";
+    btn.textContent = w;
+    btn.addEventListener("click", () => onComebackPick(w, btn));
+    box.appendChild(btn);
+  });
+}
+
+// 라이어가 후보를 선택했을 때
+function onComebackPick(word, btn) {
+  if (game.comebackDone) return;
+  game.comebackDone = true;
+  const correct = word === game.word;
+
+  $$("#comeback-options .comeback-opt").forEach((b) => {
+    b.disabled = true;
+    if (b.textContent === game.word) b.classList.add("correct"); // 정답 위치 공개
+  });
+  if (!correct) btn.classList.add("wrong");
+  sfx(correct ? "liar" : "vote");
+
+  const msg = $("#comeback-result");
+  msg.classList.remove("hidden");
+  msg.textContent = correct ? "정답! 라이어 역전승 🔥" : `땡! 정답은 "${game.word}"`;
+
+  setTimeout(() => showResult(!correct, correct), 1400);
 }
 
 // citizensWin: 시민 승리 여부 / byComeback: 라이어 역전승 여부

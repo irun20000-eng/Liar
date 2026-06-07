@@ -240,24 +240,14 @@
       </div>
     </section>
 
-    <!-- ===== 라이어 역전 화면 ===== -->
+    <!-- ===== 라이어 역전 화면 (후보 선택형) ===== -->
     <section id="screen-comeback" class="screen">
       <header class="title">
         <h1>🔥 라이어 역전 기회!</h1>
+        <p class="subtitle"><b id="comeback-name"></b> 님, 진짜 제시어를 골라보세요</p>
       </header>
-      <div class="card-panel">
-        <p class="big-text">지목된 라이어 <b id="comeback-name"></b> 님,<br />제시어가 무엇이었을까요?</p>
-        <p class="hint-text">정답을 말한 뒤 아래 버튼을 누르세요.</p>
-      </div>
-      <button id="btn-comeback-show" class="primary-btn">정답 단어 공개</button>
-      <div id="comeback-answer" class="hidden">
-        <p class="big-text">정답은 <b id="comeback-word"></b> 였습니다.</p>
-        <p class="hint-text">라이어가 맞혔나요?</p>
-        <div class="btn-row">
-          <button id="btn-comeback-yes" class="primary-btn danger">맞힘 (라이어 승)</button>
-          <button id="btn-comeback-no" class="primary-btn">못 맞힘 (시민 승)</button>
-        </div>
-      </div>
+      <div id="comeback-options" class="comeback-options"><!-- JS로 후보 10개 --></div>
+      <p id="comeback-result" class="big-text hidden"></p>
     </section>
 
     <!-- ===== 결과 화면 ===== -->

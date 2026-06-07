@@ -187,6 +187,19 @@ body {
 .brand { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .mascot { width: 72px; height: 72px; }
 
+/* 라이어 역전 — 후보 선택 */
+.comeback-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.comeback-opt {
+  padding: 16px 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--line);
+  background: var(--surface); color: var(--ink); font-family: inherit; font-size: 16px; cursor: pointer;
+  transition: transform .08s, background .12s, border-color .12s;
+}
+.comeback-opt:active { transform: scale(.97); }
+.comeback-opt:disabled { cursor: default; opacity: .85; }
+.comeback-opt.correct { background: var(--citizen-tint); border-color: var(--citizen); color: var(--citizen); font-weight: 700; opacity: 1; }
+.comeback-opt.wrong { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); font-weight: 700; opacity: 1; }
+#comeback-result { margin-top: 4px; }
+
 /* 게임 방법 링크 버튼 */
 .link-btn {
   background: none; border: none; color: var(--muted); font-family: inherit; font-size: 13px;
