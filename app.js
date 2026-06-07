@@ -19,6 +19,7 @@ const settings = {
   easy: true, // 쉬움 모드: 라이어에게 카테고리 힌트 제공
   playerNames: ["아빠", "엄마", "예예", "두지", "토리"], // 기본 닉네임
   theme: "rose", // 색 테마
+  sound: true, // 효과음 + 진동
 };
 
 // 선택 가능한 테마 (가족별 색상 + 다크모드)
@@ -78,6 +79,7 @@ function loadSettings() {
       settings.playerNames = saved.playerNames.map((n) => (typeof n === "string" ? n : "")).slice(0, MAX_PLAYERS);
     if (typeof saved.theme === "string" && THEMES.some((t) => t.id === saved.theme))
       settings.theme = saved.theme;
+    if (typeof saved.sound === "boolean") settings.sound = saved.sound;
     // 더 이상 존재하지 않는 카테고리는 걸러내기
     const valid = new Set(Object.keys(WORD_BANK));
     settings.categories = settings.categories.filter((c) => valid.has(c));
@@ -172,6 +174,59 @@ function pick(arr) {
 }
 
 // ===================================================================
+//  사운드 (WebAudio 합성 — 파일 없음) + 햅틱
+// ===================================================================
+let audioCtx = null;
+function getAudio() {
+  if (!settings.sound) return null;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 단음 재생 (주파수, 길이, 파형, 볼륨, 시작오프셋)
+function beep(freq, dur, type, vol, when) {
+  const ctx = getAudio();
+  if (!ctx) return;
+  const t0 = ctx.currentTime + (when || 0);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type || "sine";
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
+function haptic(pattern) {
+  if (settings.sound && navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (e) {}
+  }
+}
+
+// 상황별 효과음 + 진동
+function sfx(name) {
+  switch (name) {
+    case "tap":      beep(420, 0.06, "triangle", 0.12); break;
+    case "flip":     beep(300, 0.07, "sine", 0.16); beep(520, 0.08, "sine", 0.12, 0.05); haptic(12); break;
+    case "citizen":  beep(523, 0.12, "sine", 0.18); beep(784, 0.16, "sine", 0.16, 0.1); haptic(18); break;
+    case "liar":     beep(330, 0.18, "sawtooth", 0.16); beep(196, 0.32, "sawtooth", 0.16, 0.12); haptic([0, 30, 40, 60]); break;
+    case "spy":      beep(440, 0.14, "triangle", 0.16); beep(370, 0.2, "triangle", 0.14, 0.1); haptic([0, 20, 30, 30]); break;
+    case "vote":     beep(600, 0.06, "square", 0.1); haptic(10); break;
+    case "drumroll": for (let i = 0; i < 10; i++) beep(180 + i * 4, 0.05, "triangle", 0.09, i * 0.07); haptic([0, 15, 25, 15, 25, 15, 25, 15]); break;
+    case "win":      [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.22, "sine", 0.2, i * 0.12)); haptic([0, 40, 50, 40, 50, 80]); break;
+    case "lose":     [392, 330, 262].forEach((f, i) => beep(f, 0.26, "sawtooth", 0.16, i * 0.14)); haptic([0, 60, 40, 120]); break;
+  }
+}
+
+// ===================================================================
 //  설정 화면
 // ===================================================================
 function initSetup() {
@@ -198,15 +253,24 @@ function initSetup() {
   bindToggle("#opt-comeback", "comeback");
   bindToggle("#opt-timer", "timer");
   bindToggle("#opt-easy", "easy");
+  bindToggle("#opt-sound", "sound");
 
-  $("#btn-start").addEventListener("click", startGame);
+  $("#btn-start").addEventListener("click", () => { sfx("tap"); startGame(); });
   $("#btn-reset-score").addEventListener("click", resetScore);
   $("#btn-edit-words").addEventListener("click", openEditor);
+
+  // 게임 방법 (온보딩) — 최초 1회 자동 표시
+  $("#btn-help").addEventListener("click", openHelp);
+  $("#help-close").addEventListener("click", closeHelp);
+  if (!hadSaved) openHelp();
 
   renderCounts();
   renderNameInputs();
   renderScoreboard();
 }
+
+function openHelp() { $("#help-overlay").classList.remove("hidden"); }
+function closeHelp() { sfx("tap"); $("#help-overlay").classList.add("hidden"); }
 
 // 카테고리 칩 다시 그리기 (사용자 단어 추가 후에도 호출)
 function renderCategoryChips() {
@@ -443,9 +507,11 @@ function initReveal() {
   card.addEventListener("click", () => {
     if (card.classList.contains("flipped")) return;
     card.classList.add("flipped");
+    const p = game.players[game.revealIndex];
+    sfx(!p.isLiar ? "citizen" : p.word === null ? "liar" : "spy");
     $("#btn-reveal-next").classList.remove("hidden");
   });
-  $("#btn-reveal-next").addEventListener("click", nextReveal);
+  $("#btn-reveal-next").addEventListener("click", () => { sfx("tap"); nextReveal(); });
 }
 
 function startReveal() {
@@ -502,6 +568,7 @@ function nextReveal() {
 // ===================================================================
 function initDiscuss() {
   $("#btn-to-vote").addEventListener("click", () => {
+    sfx("tap");
     stopTimer();
     startVote();
   });
@@ -550,31 +617,120 @@ function stopTimer() {
 //  투표
 // ===================================================================
 function initVote() {
-  $("#btn-reveal-result").addEventListener("click", () => {
-    if (game.votedId === null) return;
-    resolveResult();
+  $("#vote-ready").addEventListener("click", () => { sfx("tap"); showVoteChoose(); });
+  $("#vote-reveal-btn").addEventListener("click", () => {
+    sfx("drumroll");
+    const btn = $("#vote-reveal-btn");
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.disabled = false;
+      if (game.votedId === null) showResult(false, false); // 동점 → 라이어 승
+      else resolveResult();
+    }, 850);
   });
 }
 
 function startVote() {
   game.votedId = null;
+  game.voteCounts = game.players.map(() => 0);
+  game.voterIndex = 0;
+  game.tieRound = 0;
+  $("#vote-sub").textContent = "한 명씩 돌아가며 비밀 투표해요";
   showScreen("screen-vote");
+  showVoteHandoff();
+}
+
+// 다음 투표자에게 넘기는 화면
+function showVoteHandoff() {
+  if (game.voterIndex >= game.players.length) { tallyVotes(); return; }
+  const voter = game.players[game.voterIndex];
+  $("#vote-handoff").classList.remove("hidden");
+  $("#vote-choose").classList.add("hidden");
+  $("#vote-outcome").classList.add("hidden");
+  $("#vote-progress").textContent = `${game.voterIndex + 1} / ${game.players.length}`;
+  $("#vote-voter").textContent = `${voter.name} 차례`;
+}
+
+// 후보 선택 화면 (자기 자신 제외)
+function showVoteChoose() {
+  const voter = game.players[game.voterIndex];
+  $("#vote-handoff").classList.add("hidden");
+  $("#vote-choose").classList.remove("hidden");
+  $("#vote-choose-label").textContent = `${voter.name} 님, 라이어로 의심되는 사람은?`;
   const list = $("#vote-list");
   list.innerHTML = "";
   game.players.forEach((p) => {
+    if (p.id === voter.id) return;
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "chip";
     chip.textContent = p.name;
-    chip.addEventListener("click", () => {
-      game.votedId = p.id;
-      $$("#vote-list .chip").forEach((c) => c.classList.remove("selected"));
-      chip.classList.add("selected");
-      $("#btn-reveal-result").disabled = false;
-    });
+    chip.addEventListener("click", () => castVote(p.id));
     list.appendChild(chip);
   });
-  $("#btn-reveal-result").disabled = true;
+}
+
+function castVote(targetId) {
+  game.voteCounts[targetId] += 1;
+  sfx("vote");
+  game.voterIndex += 1;
+  showVoteHandoff();
+}
+
+function tallyVotes() {
+  const counts = game.voteCounts;
+  const max = Math.max(...counts);
+  const top = counts.map((c, i) => (c === max ? i : -1)).filter((i) => i >= 0);
+  if (top.length === 1) {
+    showVoteOutcome(top[0], counts);
+  } else {
+    game.tieRound += 1;
+    if (game.tieRound >= 2) {
+      showVoteOutcome(null, counts); // 두 번 동점 → 지목 실패
+    } else {
+      $("#vote-sub").textContent = "동점이에요! 한 번 더 투표해요";
+      game.voteCounts = game.players.map(() => 0);
+      game.voterIndex = 0;
+      showVoteHandoff();
+    }
+  }
+}
+
+// 집계 결과(막대) 공개
+function showVoteOutcome(votedId, counts) {
+  game.votedId = votedId;
+  $("#vote-handoff").classList.add("hidden");
+  $("#vote-choose").classList.add("hidden");
+  $("#vote-outcome").classList.remove("hidden");
+  $("#vote-sub").textContent = votedId === null ? "동점! 아무도 지목하지 못했어요" : "가장 의심받은 사람은…";
+
+  const tally = $("#vote-tally");
+  tally.innerHTML = "";
+  const max = Math.max(1, ...counts);
+  game.players.forEach((p) => {
+    const row = document.createElement("div");
+    row.className = "tally-row" + (p.id === votedId ? " top" : "");
+
+    const name = document.createElement("span");
+    name.className = "tally-name";
+    name.textContent = p.name;
+
+    const bar = document.createElement("span");
+    bar.className = "tally-bar";
+    const fill = document.createElement("span");
+    fill.className = "tally-fill";
+    fill.style.width = (counts[p.id] / max) * 100 + "%";
+    bar.appendChild(fill);
+
+    const num = document.createElement("span");
+    num.className = "tally-num";
+    num.textContent = counts[p.id];
+
+    row.appendChild(name);
+    row.appendChild(bar);
+    row.appendChild(num);
+    tally.appendChild(row);
+  });
 }
 
 // ===================================================================
@@ -632,6 +788,7 @@ function showResult(citizensWin, byComeback) {
   } else {
     $("#result-title").textContent = "😈 라이어 승리!";
   }
+  sfx(citizensWin ? "win" : "lose");
 
   $("#result-word").textContent = game.word;
   $("#result-category").textContent = `(${game.category})`;
@@ -660,8 +817,9 @@ function showResult(citizensWin, byComeback) {
 }
 
 function initResult() {
-  $("#btn-replay").addEventListener("click", startGame);
+  $("#btn-replay").addEventListener("click", () => { sfx("tap"); startGame(); });
   $("#btn-home").addEventListener("click", () => {
+    sfx("tap");
     stopTimer();
     showScreen("screen-setup");
   });

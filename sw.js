@@ -1,7 +1,7 @@
 // 라이어 게임 서비스 워커
 // 전략: 같은 출처(앱 파일)는 "네트워크 우선" → 온라인이면 항상 최신,
 //       오프라인이면 캐시로 폴백. (수정사항이 바로 반영되도록)
-const CACHE = "liar-v2";
+const CACHE = "liar-v3";
 const ASSETS = [
   "./",
   "./index.html",
