@@ -328,6 +328,15 @@ body {
 .timer { font-size: 52px; font-weight: 800; text-align: center; margin-bottom: 16px; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
 .timer.warn { color: var(--accent); }
 
+/* ===== 설명 순서 ===== */
+.speak-order-list { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.speak-chip {
+  padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 600;
+  background: var(--field); border: 1.5px solid var(--line); color: var(--ink);
+}
+.speak-chip.first { background: var(--accent); border-color: var(--accent); color: #fff; }
+.speak-arrow { color: var(--muted); font-size: 14px; }
+
 /* ===== 토론 규칙 ===== */
 .rule-list { list-style: none; display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 1.5; }
 .rule-list li { padding-left: 22px; position: relative; color: var(--ink); }

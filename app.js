@@ -517,8 +517,8 @@ function initReveal() {
   card.addEventListener("click", () => {
     if (card.classList.contains("flipped")) return;
     card.classList.add("flipped");
-    const p = game.players[game.revealIndex];
-    sfx(!p.isLiar ? "citizen" : p.word === null ? "liar" : "spy");
+    // 모든 역할에 동일한 효과음/진동 (소리로 라이어가 들통나지 않게)
+    sfx("flip");
     $("#btn-reveal-next").classList.remove("hidden");
   });
   $("#btn-reveal-next").addEventListener("click", () => { sfx("tap"); nextReveal(); });
@@ -586,6 +586,7 @@ function initDiscuss() {
 
 function startDiscuss() {
   showScreen("screen-discuss");
+  renderSpeakOrder();
   const display = $("#timer-display");
   if (settings.timer) {
     display.classList.remove("hidden");
@@ -593,6 +594,26 @@ function startDiscuss() {
   } else {
     display.classList.add("hidden");
   }
+}
+
+// 모두 확인 후 무작위 설명 순서 안내 (역할 확인 순서와 무관)
+function renderSpeakOrder() {
+  const el = $("#speak-order");
+  if (!el) return;
+  el.innerHTML = "";
+  const order = shuffle(game.players);
+  order.forEach((p, i) => {
+    const chip = document.createElement("span");
+    chip.className = "speak-chip" + (i === 0 ? " first" : "");
+    chip.textContent = p.name;
+    el.appendChild(chip);
+    if (i < order.length - 1) {
+      const arrow = document.createElement("span");
+      arrow.className = "speak-arrow";
+      arrow.textContent = "→";
+      el.appendChild(arrow);
+    }
+  });
 }
 
 function startTimer(seconds) {
