@@ -516,9 +516,11 @@ function initReveal() {
   const card = $("#role-card");
   card.addEventListener("click", () => {
     if (card.classList.contains("flipped")) return;
+    if (!game || game.revealIndex >= game.players.length) return;
+    // 제시어/역할은 "탭하는 순간"에만 카드에 채운다 (전달 중 엿보기 방지)
+    fillCardContent(game.players[game.revealIndex]);
     card.classList.add("flipped");
-    // 모든 역할에 동일한 효과음/진동 (소리로 라이어가 들통나지 않게)
-    sfx("flip");
+    sfx("flip"); // 모든 역할 동일 효과음
     $("#btn-reveal-next").classList.remove("hidden");
   });
   $("#btn-reveal-next").addEventListener("click", () => { sfx("tap"); nextReveal(); });
@@ -527,25 +529,38 @@ function initReveal() {
 function startReveal() {
   game.revealIndex = 0;
   showScreen("screen-reveal");
-  renderRevealCard();
+  setupHandoff();
 }
 
-function renderRevealCard() {
+// 다음 사람에게 넘기는 상태: 카드 앞면(face-down) + 뒷면 내용 비움
+function setupHandoff() {
   const i = game.revealIndex;
   const p = game.players[i];
   const card = $("#role-card");
-
   card.classList.remove("flipped");
-  // 역할별 카드 색상 클래스 초기화 후 지정
-  card.classList.remove("role-citizen", "role-liar", "role-spy");
-  card.classList.add(!p.isLiar ? "role-citizen" : p.word === null ? "role-liar" : "role-spy");
+  clearCardContent(); // 전달 애니메이션 동안 뒷면은 항상 비어 있음
   $("#btn-reveal-next").classList.add("hidden");
   $("#reveal-progress").textContent = `${i + 1} / ${game.players.length}`;
   $("#reveal-handoff").textContent = `${p.name}, 폰을 받으세요`;
+}
 
-  // 뒷면 내용 채우기
+// 카드 뒷면 내용 제거 (보안)
+function clearCardContent() {
+  const card = $("#role-card");
+  card.classList.remove("role-citizen", "role-liar", "role-spy");
+  $("#role-label").textContent = "";
+  $("#role-word").textContent = "";
+  $("#role-desc").textContent = "";
+}
+
+// 현재 플레이어의 역할/제시어를 카드 뒷면에 채움
+function fillCardContent(p) {
+  const card = $("#role-card");
+  card.classList.remove("role-citizen", "role-liar", "role-spy");
+  card.classList.add(!p.isLiar ? "role-citizen" : p.word === null ? "role-liar" : "role-spy");
+
   if (p.isLiar && p.word === null) {
-    // 기본 모드 라이어
+    // 기본 모드 라이어 — 제시어를 절대 보여주지 않음
     $("#role-label").textContent = "🤫 당신은";
     $("#role-word").textContent = "라이어";
     $("#role-desc").textContent = settings.easy
@@ -569,7 +584,7 @@ function nextReveal() {
   if (game.revealIndex >= game.players.length) {
     startDiscuss();
   } else {
-    renderRevealCard();
+    setupHandoff();
   }
 }
 
