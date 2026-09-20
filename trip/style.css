@@ -177,6 +177,28 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .members-edit { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0 12px; }
 .members-edit input { width: 100%; padding: 6px 8px; font-size: .82rem; text-align: center; }
 
+/* 가족 공유 */
+.sync-box { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.me-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.me-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.me-chips button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 5px 10px; font: inherit; font-size: .84rem; font-weight: 600; cursor: pointer; display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.me-chips button small { font-size: .66rem; color: var(--muted); font-weight: 500; }
+.me-chips button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.me-chips button.on small { color: inherit; opacity: .85; }
+.sync-status { font-size: .84rem; margin: 10px 0 8px; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; background: var(--muted); }
+.dot.on { background: var(--good); box-shadow: 0 0 0 3px var(--good-tint); } .dot.err { background: var(--warn); } .dot.off { background: var(--muted); }
+.sync-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.sync-more { flex-basis: 100%; margin-top: 6px; }
+.sync-more summary { cursor: pointer; font-size: .82rem; color: var(--navy); font-weight: 600; }
+.sync-more code { font-size: .74rem; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+.sync-more .toolbar { margin: 8px 0 4px; } .sync-more input { flex: 1 1 200px; }
+.small-h { font-size: .86rem; color: var(--muted); }
+.activity { list-style: none; padding: 0; margin: 4px 0 0; font-size: .84rem; }
+.activity li { padding: 4px 0; border-top: 1px dashed var(--line); }
+.activity li:first-child { border-top: 0; }
+.vote-row button.me { border-width: 2px; font-weight: 700; }
+
 /* 유형 탭 */
 .type-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
 .type-tabs::-webkit-scrollbar { display: none; }

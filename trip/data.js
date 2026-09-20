@@ -18,15 +18,17 @@ window.TRIP = {
       { id: 'd3', date: '2027-01-22', dow: '금', label: 'D3 · 1/22(금)', hint: '마지막 온전한 하루', start: '09:00' },
       { id: 'd4', date: '2027-01-23', dow: '토', label: 'D4 · 1/23(토)', hint: '오전 일정 → 대전 귀가', start: '09:30' }
     ],
-    home: { name: '대전(출발·귀가)', lat: 36.3504, lng: 127.3845 }
+    home: { name: '대전(출발·귀가)', lat: 36.3504, lng: 127.3845 },
+    // 가족 실시간 공유 기본 저장소 (설정 없이 사용 가능한 공개 JSON 저장소). Firebase 등 직접 주소도 연결 가능
+    syncProviders: { jsonblob: { create: 'https://jsonblob.com/api/jsonBlob', label: 'jsonblob (설정 없음)' } }
   },
 
   members: [
     { id: 'dad', name: '아빠', emoji: '👨' },
     { id: 'mom', name: '엄마', emoji: '👩' },
-    { id: 'k1', name: '첫째(중2)', emoji: '🧑' },
-    { id: 'k2', name: '둘째(초6)', emoji: '👦' },
-    { id: 'k3', name: '셋째(초3)', emoji: '👧' }
+    { id: 'k1', name: '예은', emoji: '🎒', sub: '첫째·중2' },
+    { id: 'k2', name: '현서', emoji: '⚽', sub: '둘째·초6' },
+    { id: 'k3', name: '은설', emoji: '🧸', sub: '셋째·초3' }
   ],
 
   types: [

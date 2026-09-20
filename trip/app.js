@@ -44,17 +44,23 @@
 
   /* ---------- 상태 ---------- */
   const defaults = () => ({
-    theme: 'auto', members: {}, votes: {}, checks: {},
+    theme: 'auto', vt: {}, mem: {}, checks: {}, sync: { kind: '', url: '', me: '', last: 0, err: '' },
     mine: Object.fromEntries(T.meta.days.map(d => [d.id, []])),
     mineStart: Object.fromEntries(T.meta.days.map(d => [d.id, d.start])),
     planId: 'A', planDay: 'd1', mineDay: 'd1', poolType: '', poolFilters: {}, poolSort: 'rec', poolRegion: '',
     budget: { stayId: 'stay_fraser', nightly: '', nights: 4, fuelEff: 12, fuelPrice: 1700, extraKm: 0, tolls: 20000, parkingPerDay: 15000, parkingDays: 3, mealB: 6000, mealL: 12000, mealD: 15000, snacks: 20000, reservePct: 10, scenario: 'base' }
   });
   let S = defaults();
-  try { const raw = localStorage.getItem(KEY); if (raw) { const d = defaults(), o = JSON.parse(raw); S = Object.assign(d, o); S.budget = Object.assign(d.budget, o.budget || {}); if (!byId[S.budget.stayId]) S.budget.stayId = d.budget.stayId; } } catch (e) { /* 저장 불가 환경 */ }
+  try { const raw = localStorage.getItem(KEY); if (raw) { const d = defaults(), o = JSON.parse(raw); S = Object.assign(d, o); S.budget = Object.assign(d.budget, o.budget || {}); S.sync = Object.assign(d.sync, o.sync || {}); if (!byId[S.budget.stayId]) S.budget.stayId = d.budget.stayId; } } catch (e) { /* 저장 불가 환경 */ }
+  // 구버전(votes 배열 · members 이름) → vt/mem 마이그레이션
+  if (S.votes && !Object.keys(S.vt || {}).length) { S.vt = {}; Object.entries(S.votes).forEach(([pid, arr]) => (arr || []).forEach(mid => { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: true, ts: 1 }; })); }
+  if (S.members && !Object.keys(S.mem || {}).length) { S.mem = {}; Object.entries(S.members).forEach(([mid, name]) => { if (name) S.mem[mid] = { name, ts: 1 }; }); }
+  delete S.votes; delete S.members; S.vt = S.vt || {}; S.mem = S.mem || {};
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } };
-  const memberName = m => S.members[m.id] || m.name;
-  const voteCount = pid => (S.votes[pid] || []).length;
+  const memberName = m => (S.mem[m.id] && S.mem[m.id].name) || m.name;
+  const votedBy = pid => Object.entries(S.vt[pid] || {}).filter(([, v]) => v.on).map(([mid]) => mid);
+  const voteCount = pid => votedBy(pid).length;
+  function setVote(pid, mid, on) { (S.vt[pid] = S.vt[pid] || {})[mid] = { on, ts: Date.now() }; save(); if (typeof SYNC !== 'undefined') SYNC.schedulePush(); }
 
   let toastTimer;
   function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 2200); }
@@ -296,14 +302,15 @@
 
     // 가족 이름
     $('#members-edit').innerHTML = T.members.map(m => `<input type="text" value="${esc(memberName(m))}" data-member="${m.id}" aria-label="가족 이름">`).join('');
+    renderSyncCard();
 
     // 랭킹
     const ranked = T.places.filter(p => voteCount(p.id) > 0).sort((a, b) => voteCount(b.id) - voteCount(a.id) || a.name.localeCompare(b.name)).slice(0, 12);
-    $('#vote-ranking').innerHTML = ranked.length ? ranked.map(p => `<li><button data-open="${p.id}">${esc(p.name)}</button><span class="hearts">${(S.votes[p.id] || []).map(mid => T.members.find(m => m.id === mid)?.emoji || '❤️').join(' ')} · ${voteCount(p.id)}표</span></li>`).join('') : '<li class="muted">아직 찜한 장소가 없습니다. 장소 카드를 열어 하트를 눌러보세요.</li>';
+    $('#vote-ranking').innerHTML = ranked.length ? ranked.map(p => `<li><button data-open="${p.id}">${esc(p.name)}</button><span class="hearts">${votedBy(p.id).map(mid => { const m = T.members.find(x => x.id === mid); return m ? `<span title="${esc(memberName(m))}">${m.emoji}</span>` : '❤️'; }).join(' ')} · ${voteCount(p.id)}표</span></li>`).join('') : '<li class="muted">아직 찜한 장소가 없습니다. 장소 카드를 열어 하트를 눌러보세요.</li>';
   }
   $('#view-home').addEventListener('change', e => {
     if (e.target.dataset.check) { S.checks[e.target.dataset.check] = e.target.checked; save(); renderHome(); }
-    if (e.target.dataset.member) { S.members[e.target.dataset.member] = e.target.value.trim() || T.members.find(m => m.id === e.target.dataset.member).name; save(); renderHome(); }
+    if (e.target.dataset.member) { const mid = e.target.dataset.member; S.mem[mid] = { name: e.target.value.trim() || T.members.find(m => m.id === mid).name, ts: Date.now() }; save(); SYNC.schedulePush(); renderHome(); }
   });
 
   /* ---------- 장소 풀 ---------- */
@@ -396,7 +403,7 @@
         <a class="btn small" href="${kakaoTo(p)}" target="_blank" rel="noopener">🚗 길찾기</a>
         <a class="btn small" href="#map/${p.id}" data-close>🗺️ 지도에서</a>
       </div>
-      <div class="vote-row">${T.members.map(m => `<button data-vote="${m.id}" class="${(S.votes[pid] || []).includes(m.id) ? 'on' : ''}">${m.emoji} ${esc(memberName(m))} ${(S.votes[pid] || []).includes(m.id) ? '❤️' : '♡'}</button>`).join('')}</div>
+      <div class="vote-row">${T.members.slice().sort((a, b) => (b.id === S.sync.me) - (a.id === S.sync.me)).map(m => { const on = votedBy(pid).includes(m.id), mine = m.id === S.sync.me; return `<button data-vote="${m.id}" class="${on ? 'on' : ''} ${mine ? 'me' : ''}">${mine ? '나 · ' : ''}${m.emoji} ${esc(memberName(m))} ${on ? '❤️' : '♡'}</button>`; }).join('')}${!S.sync.me ? '<span class="small muted">개요 탭에서 "나는 누구"를 고르면 내 버튼이 앞에 옵니다</span>' : ''}</div>
       <div class="add-row"><span class="small muted">내 일정에 담기 →</span><select id="detail-day">${T.meta.days.map(d => `<option value="${d.id}" ${d.id === S.mineDay ? 'selected' : ''}>${d.label}</option>`).join('')}</select><button class="btn primary small" data-add="${pid}">＋ 추가</button></div>
     </div>`;
     $('#modal').hidden = false; document.body.style.overflow = 'hidden';
@@ -407,8 +414,8 @@
     if (e.target.closest('[data-close]')) { closeModals(); return; }
     const o = e.target.closest('[data-open]'); if (o) { openDetail(o.dataset.open); return; }
     const v = e.target.closest('[data-vote]'); if (v) {
-      const pid = $('#modal-card').dataset.pid, mid = v.dataset.vote; const arr = S.votes[pid] || []; const i = arr.indexOf(mid);
-      if (i >= 0) arr.splice(i, 1); else arr.push(mid); S.votes[pid] = arr; save(); openDetail(pid); renderHome(); renderPool(); return;
+      const pid = $('#modal-card').dataset.pid, mid = v.dataset.vote;
+      setVote(pid, mid, !votedBy(pid).includes(mid)); openDetail(pid); renderHome(); renderPool(); return;
     }
     const a = e.target.closest('[data-add]'); if (a) { addPlace(a.dataset.add, $('#detail-day').value); closeModals(); return; }
   });
@@ -501,7 +508,7 @@
   });
   $('#btn-reset').addEventListener('click', () => { if (!S.mine[S.mineDay].length) return; if (confirm(`${dayById[S.mineDay].label} 일정을 모두 지울까요?`)) { S.mine[S.mineDay] = []; save(); renderMine(); renderHome(); } });
   $('#btn-export').addEventListener('click', () => {
-    const data = { app: 'seoul-winter-trip', version: 1, exportedAt: new Date().toISOString(), members: S.members, votes: S.votes, checks: S.checks, mine: S.mine, mineStart: S.mineStart, budget: S.budget };
+    const data = { app: 'seoul-winter-trip', version: 2, exportedAt: new Date().toISOString(), mem: S.mem, vt: S.vt, checks: S.checks, mine: S.mine, mineStart: S.mineStart, budget: S.budget };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `seoul-trip-2027-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
     toast('JSON 파일로 내보냈습니다');
@@ -511,7 +518,7 @@
     f.text().then(txt => {
       const d = JSON.parse(txt); if (d.app !== 'seoul-winter-trip') throw new Error('형식이 다릅니다');
       if (!confirm('가져온 내용으로 내 일정·찜·체크를 덮어쓸까요?')) return;
-      ['members', 'votes', 'checks', 'mine', 'mineStart'].forEach(k => { if (d[k]) S[k] = d[k]; }); if (d.budget) S.budget = Object.assign(defaults().budget, d.budget);
+      ['checks', 'mine', 'mineStart', 'vt', 'mem'].forEach(k => { if (d[k]) S[k] = d[k]; }); if (d.votes && !d.vt) { S.vt = {}; Object.entries(d.votes).forEach(([pid, arr]) => (arr || []).forEach(mid => { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: true, ts: 1 }; })); } if (d.members && !d.mem) { S.mem = {}; Object.entries(d.members).forEach(([mid, name]) => { S.mem[mid] = { name, ts: 1 }; }); } if (d.budget) S.budget = Object.assign(defaults().budget, d.budget); SYNC.schedulePush();
       T.meta.days.forEach(x => { S.mine[x.id] = S.mine[x.id] || []; S.mineStart[x.id] = S.mineStart[x.id] || x.start; });
       save(); renderAll(); toast('가져오기 완료');
     }).catch(err => alert('가져오기 실패: ' + err.message)).finally(() => { e.target.value = ''; });
@@ -570,7 +577,7 @@
   function sharePayload() {
     // 슬롯을 배열로 축약: [p, title, kind, dur, fixed, act, note]
     const days = T.meta.days.map(d => S.mine[d.id].map(s => [s.p || '', s.title || '', s.kind || '', s.dur, s.fixed || '', s.act || '', s.note || '']));
-    return b64e(JSON.stringify({ v: 1, st: T.meta.days.map(d => S.mineStart[d.id]), m: S.members, d: days, b: S.budget }));
+    return b64e(JSON.stringify({ v: 1, st: T.meta.days.map(d => S.mineStart[d.id]), d: days, b: S.budget, r: S.sync.url ? SYNC.token() : undefined }));
   }
   function applyShare(code) {
     const o = JSON.parse(b64d(code)); if (o.v !== 1 || !Array.isArray(o.d)) throw new Error('형식 오류');
@@ -578,8 +585,8 @@
       S.mine[d.id] = (o.d[i] || []).map(a => ({ id: uid(), p: a[0] || undefined, title: a[1] || undefined, kind: a[2] || undefined, dur: a[3], fixed: a[4] || null, act: a[5] || '', note: a[6] || '' })).filter(s => !s.p || byId[s.p]);
       S.mineStart[d.id] = (o.st && o.st[i]) || d.start;
     });
-    if (o.m) S.members = o.m;
     if (o.b) S.budget = Object.assign(defaults().budget, o.b);
+    if (o.r && !S.sync.url) { try { SYNC.join(o.r); } catch (e) { /* 무시 */ } }
     save(); renderAll();
   }
   $('#btn-share').addEventListener('click', async () => {
@@ -592,6 +599,8 @@
     } catch (e) { prompt('아래 링크를 복사하세요', url); }
   });
   function checkShareHash() {
+    const rm = location.hash.match(/room=([A-Za-z0-9\-_]+)/);
+    if (rm) { try { SYNC.join(rm[1]); toast('가족방에 연결했습니다 — "나는 누구"를 골라주세요'); } catch (e) { alert('가족 링크를 해석할 수 없습니다: ' + e.message); } history.replaceState(null, '', '#home'); renderHome(); }
     const m = location.hash.match(/share=([A-Za-z0-9\-_]+)/); if (!m) return;
     const has = Object.values(S.mine).some(d => d.length);
     if (!has || confirm('공유받은 일정으로 내 일정을 바꿀까요? (현재 내용은 사라집니다)')) {
@@ -665,7 +674,106 @@
     top.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   })();
 
+  /* ---------- 가족 실시간 공유 (JSON 저장소 폴링 + LWW 병합) ---------- */
+  const SYNC = (() => {
+    let timer = null, pushTimer = null, busy = false;
+    const now = () => Date.now();
+    const state = () => ({ v: 1, app: 'seoul-winter-trip', vt: S.vt, mem: S.mem, updatedAt: now() });
+    function merge(remote) {
+      let changed = false, localNewer = false;
+      const rv = (remote && remote.vt) || {}, rm = (remote && remote.mem) || {};
+      for (const pid in rv) for (const mid in rv[pid]) {
+        const r = rv[pid][mid], l = S.vt[pid] && S.vt[pid][mid];
+        if (!l || (r.ts || 0) > (l.ts || 0)) { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: !!r.on, ts: r.ts || 0 }; changed = true; }
+        else if ((l.ts || 0) > (r.ts || 0)) localNewer = true;
+      }
+      for (const pid in S.vt) for (const mid in S.vt[pid]) if (!(rv[pid] && rv[pid][mid])) localNewer = true;
+      for (const mid in rm) { const r = rm[mid], l = S.mem[mid]; if (!l || (r.ts || 0) > (l.ts || 0)) { S.mem[mid] = { name: String(r.name || ''), ts: r.ts || 0 }; changed = true; } else if ((l.ts || 0) > (r.ts || 0)) localNewer = true; }
+      for (const mid in S.mem) if (!rm[mid]) localNewer = true;
+      return { changed, localNewer };
+    }
+    async function get() { const r = await fetch(S.sync.url, { headers: { Accept: 'application/json' }, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+    async function put(obj) { const r = await fetch(S.sync.url, { method: 'PUT', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(obj) }); if (!r.ok) throw new Error('HTTP ' + r.status); }
+    function afterChange(changed) { save(); if (changed) { renderHome(); renderPool(); if ($('#modal').hidden === false && $('#modal-card').dataset.pid) openDetail($('#modal-card').dataset.pid); } else renderSyncStatus(); }
+    async function pull(force) {
+      if (!S.sync.url || busy) return; busy = true;
+      try { const remote = await get(); const m = merge(remote); if (m.localNewer) await put(state()); S.sync.last = now(); S.sync.err = ''; afterChange(m.changed || force); }
+      catch (e) { S.sync.err = e.message; save(); renderSyncStatus(); }
+      finally { busy = false; }
+    }
+    async function push() {
+      if (!S.sync.url) return; if (busy) { schedulePush(); return; } busy = true;
+      try { const remote = await get().catch(() => null); const m = remote ? merge(remote) : { changed: false }; await put(state()); S.sync.last = now(); S.sync.err = ''; afterChange(m.changed); }
+      catch (e) { S.sync.err = e.message; save(); renderSyncStatus(); }
+      finally { busy = false; }
+    }
+    function schedulePush() { if (!S.sync.url) return; clearTimeout(pushTimer); pushTimer = setTimeout(push, 500); }
+    function start() { stop(); if (!S.sync.url) { renderSyncStatus(); return; } pull(true); timer = setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 5000); }
+    function stop() { clearInterval(timer); timer = null; }
+    async function createRoom() {
+      const prov = T.meta.syncProviders.jsonblob;
+      const r = await fetch(prov.create, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(state()) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      let url = r.headers.get('Location') || '';
+      const id = r.headers.get('X-jsonblob');
+      if (!url && id) url = prov.create + '/' + id;
+      if (url && !/^https?:/.test(url)) url = new URL(url, prov.create).href;
+      if (!url) throw new Error('저장소 주소를 받지 못했습니다 (브라우저가 응답 헤더를 숨김) — 직접 주소 연결(Firebase)을 이용하세요');
+      connect('jsonblob', url);
+    }
+    function connect(kind, url) { S.sync.kind = kind; S.sync.url = url; S.sync.err = ''; S.sync.last = 0; save(); start(); }
+    function join(tokenOrUrl) {
+      let kind = 'url', url = tokenOrUrl.trim();
+      if (!/^https?:/.test(url)) { const o = JSON.parse(b64d(url)); kind = o.k || 'url'; url = o.u; }
+      if (!/^https:\/\/|^http:\/\/localhost/.test(url)) throw new Error('https 주소만 연결할 수 있습니다');
+      connect(kind, url);
+    }
+    const token = () => b64e(JSON.stringify({ k: S.sync.kind, u: S.sync.url }));
+    const link = () => `${location.origin}${location.pathname}#home/room=${token()}`;
+    function leave() { stop(); S.sync = Object.assign({}, S.sync, { kind: '', url: '', last: 0, err: '' }); save(); renderHome(); }
+    return { start, stop, pull, push, schedulePush, createRoom, join, link, leave, token };
+  })();
+
+  const fmtAgo = ts => { if (!ts) return ''; const s = Math.round((Date.now() - ts) / 1000); return s < 5 ? '방금' : s < 60 ? `${s}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
+  function renderSyncStatus() {
+    const el = $('#sync-status'); if (!el) return;
+    if (!S.sync.url) { el.innerHTML = '<span class="dot off"></span> 이 기기에만 저장 중 — 아래에서 가족방을 만들면 서로의 찜이 실시간으로 보입니다'; return; }
+    el.innerHTML = S.sync.err ? `<span class="dot err"></span> 연결 오류: ${esc(S.sync.err)} · 자동 재시도 중` : `<span class="dot on"></span> 가족 공유 중 (${S.sync.kind === 'jsonblob' ? 'jsonblob' : '직접 주소'}) · 마지막 갱신 ${S.sync.last ? fmtAgo(S.sync.last) : '…'}`;
+  }
+  function renderSyncCard() {
+    const el = $('#sync-card'); if (!el) return;
+    const me = S.sync.me;
+    const meChips = T.members.map(m => `<button data-me="${m.id}" class="${me === m.id ? 'on' : ''}">${m.emoji} ${esc(memberName(m))}<small>${esc(m.sub || '')}</small></button>`).join('');
+    const acts = []; Object.entries(S.vt).forEach(([pid, ms]) => Object.entries(ms).forEach(([mid, v]) => { if (v.ts > 1 && byId[pid]) acts.push({ pid, mid, on: v.on, ts: v.ts }); }));
+    acts.sort((a, b) => b.ts - a.ts);
+    const feed = acts.slice(0, 6).map(a => { const m = T.members.find(x => x.id === a.mid); return `<li>${m ? m.emoji + ' ' + esc(memberName(m)) : '?'} ${a.on ? '❤️' : '💔'} <button class="link-btn" data-open="${a.pid}">${esc(byId[a.pid].name)}</button> <span class="muted">${fmtAgo(a.ts)}</span></li>`; }).join('');
+    const connected = !!S.sync.url;
+    el.innerHTML = `
+      <div class="me-row"><span class="small muted">나는</span><div class="me-chips">${meChips}</div></div>
+      <p class="sync-status" id="sync-status"></p>
+      <div class="sync-actions">${connected
+        ? `<button class="btn small primary" id="sync-link">🔗 가족 링크 복사</button><button class="btn small" id="sync-now">🔄 지금 갱신</button><button class="btn small danger" id="sync-leave">연결 해제</button>`
+        : `<button class="btn small primary" id="sync-create">✨ 가족방 만들기 (설정 없음)</button>
+           <details class="sync-more"><summary>직접 주소로 연결 (Firebase 등)</summary>
+             <div class="toolbar"><input type="url" id="sync-url" placeholder="https://…/rooms/family.json 또는 가족 링크의 코드"><button class="btn small" id="sync-join">연결</button></div>
+             <p class="small muted">Firebase Realtime Database를 쓰려면: 콘솔에서 프로젝트 생성 → Realtime Database 만들기 → 규칙을 <code>{"rules":{"rooms":{".read":true,".write":true}}}</code>로 게시 → 데이터베이스 주소 뒤에 <code>/rooms/우리집.json</code>을 붙여 여기에 입력. 가족방 만들기(jsonblob)는 공개 무료 저장소라 30일 이상 아무도 열지 않으면 지워질 수 있고, 그때는 각자 기기에 남은 찜을 새 방에 다시 올리면 됩니다.</p>
+           </details>`}
+      </div>
+      ${feed ? `<h3 class="mt small-h">최근 찜 활동</h3><ul class="activity">${feed}</ul>` : ''}`;
+    renderSyncStatus();
+  }
+  document.addEventListener('click', async e => {
+    const me = e.target.closest('[data-me]'); if (me) { S.sync.me = S.sync.me === me.dataset.me ? '' : me.dataset.me; save(); renderSyncCard(); return; }
+    if (e.target.id === 'sync-create') { e.target.disabled = true; try { await SYNC.createRoom(); renderHome(); toast('가족방을 만들었습니다 — 링크를 가족에게 보내세요'); } catch (err) { alert('가족방 생성 실패: ' + err.message); e.target.disabled = false; } return; }
+    if (e.target.id === 'sync-join') { try { SYNC.join($('#sync-url').value); renderHome(); toast('연결했습니다'); } catch (err) { alert('연결 실패: ' + err.message); } return; }
+    if (e.target.id === 'sync-link') { const url = SYNC.link(); try { if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title: '서울 겨울 가족여행 — 가족방', url }); return; } await navigator.clipboard.writeText(url); toast('가족 링크를 복사했습니다'); } catch (err) { prompt('아래 링크를 복사하세요', url); } return; }
+    if (e.target.id === 'sync-now') { SYNC.pull(true); toast('갱신 중…'); return; }
+    if (e.target.id === 'sync-leave') { if (confirm('가족방 연결을 해제할까요? (찜은 이 기기에 남습니다)')) SYNC.leave(); return; }
+  });
+  setInterval(renderSyncStatus, 10000);
+
   /* ---------- 초기화 ---------- */
   function renderAll() { renderHome(); renderPool(); renderPlans(); renderMine(); }
-  applyTheme(); renderAll(); checkShareHash(); route();
+  applyTheme(); renderAll(); checkShareHash(); route(); SYNC.start();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') SYNC.pull(); });
 })();
