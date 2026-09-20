@@ -1,7 +1,7 @@
 // 서울 겨울 가족여행 플래너 서비스 워커
 // 전략: 같은 출처 파일은 네트워크 우선(온라인이면 항상 최신), 오프라인이면 캐시 폴백.
 // 지도 타일·폰트 등 외부 리소스는 브라우저 기본 처리(오프라인에서는 지도만 안 보임).
-const CACHE = "trip-v3";
+const CACHE = "trip-v4";
 const ASSETS = ["./", "./index.html", "./style.css", "./app.js", "./data.js", "./plans.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
