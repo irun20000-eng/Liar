@@ -136,6 +136,7 @@
       }
       const kind = p ? `kind-place type-${p.type}` : `kind-${s.kind || 'custom'}`;
       const name = p ? `<button class="link" data-open="${p.id}">${esc(p.name)}</button>` : esc(s.title || '자유 슬롯');
+      const grip = editable ? `<span class="grip" title="끌어서 순서 변경" draggable="true" data-grip="${r.i}">⋮⋮</span>` : '';
       const chips = p ? `${typeChip(p)}${p.reserve === 'required' ? '<span class="chip">예약 필수</span>' : ''}${p.status !== 'ok' ? statusChip(p) : ''}` : (s.kind === 'move' ? '<span class="chip">이동</span>' : s.kind === 'rest' ? '<span class="chip">휴식</span>' : '');
       const warns = r.warns.map(w => `<span class="chip ${w.k}">⚠️ ${esc(w.t)}</span>`).join('');
       let edit = '';
@@ -151,10 +152,10 @@
         </div>
         <textarea class="note-edit" data-i="${r.i}" data-field="note" placeholder="비고 (참고사항)">${esc(s.note || '')}</textarea>`;
       }
-      html += `<div class="slot ${kind}">
+      html += `<div class="slot ${kind}" data-slot="${r.i}">
         <div class="time">${fmtT(r.start)}<small>~ ${fmtT(r.end)}</small><small>${r.dur}분</small></div>
         <div class="body">
-          <div class="name">${name}${chips}</div>
+          <div class="name">${grip}${name}${chips}</div>
           ${s.act ? `<div class="act">${esc(s.act)}</div>` : ''}
           ${p ? `<div class="pcard-meta"><span>📍 ${esc(regionById[p.region]?.label || '')}</span><span>💰 5인 ${won(familyCost(p))}</span><span>🕒 ${esc(p.hours)}</span></div>` : ''}
           ${warns ? `<div class="warns">${warns}</div>` : ''}
@@ -410,6 +411,73 @@
     const b = e.target.closest('[data-pick]'); if (b) { addPlace(b.dataset.pick, pickerDay); }
   });
 
+  // 드래그 정렬 (데스크톱 HTML5 DnD; 모바일은 ↑↓ 버튼)
+  let dragFrom = null;
+  $('#mine-days').addEventListener('dragstart', e => {
+    const g = e.target.closest('[data-grip]'); if (!g) { e.preventDefault(); return; }
+    dragFrom = Number(g.dataset.grip); g.closest('.slot').classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragFrom));
+  });
+  $('#mine-days').addEventListener('dragover', e => {
+    const slot = e.target.closest('.slot[data-slot]'); if (!slot || dragFrom == null) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    const rect = slot.getBoundingClientRect(); const before = (e.clientY - rect.top) < rect.height / 2;
+    $$('.slot', slot.parentElement).forEach(x => x.classList.remove('drop-before', 'drop-after'));
+    slot.classList.add(before ? 'drop-before' : 'drop-after');
+  });
+  $('#mine-days').addEventListener('dragleave', e => { const slot = e.target.closest('.slot'); if (slot) slot.classList.remove('drop-before', 'drop-after'); });
+  $('#mine-days').addEventListener('drop', e => {
+    const slot = e.target.closest('.slot[data-slot]'); if (!slot || dragFrom == null) return;
+    e.preventDefault();
+    const to = Number(slot.dataset.slot); const rect = slot.getBoundingClientRect(); const before = (e.clientY - rect.top) < rect.height / 2;
+    const arr = S.mine[S.mineDay]; if (dragFrom === to) { dragFrom = null; renderMine(); return; }
+    const [item] = arr.splice(dragFrom, 1);
+    let idx = to; if (dragFrom < to) idx -= 1; if (!before) idx += 1;
+    arr.splice(Math.max(0, Math.min(idx, arr.length)), 0, item);
+    dragFrom = null; save(); renderMine();
+  });
+  $('#mine-days').addEventListener('dragend', () => { dragFrom = null; $$('.slot').forEach(x => x.classList.remove('dragging', 'drop-before', 'drop-after')); });
+
+  // 공유 링크: 내 일정 전체를 URL 해시에 압축 인코딩
+  const b64e = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64d = str => decodeURIComponent(escape(atob(str.replace(/-/g, '+').replace(/_/g, '/'))));
+  function sharePayload() {
+    // 슬롯을 배열로 축약: [p, title, kind, dur, fixed, act, note]
+    const days = T.meta.days.map(d => S.mine[d.id].map(s => [s.p || '', s.title || '', s.kind || '', s.dur, s.fixed || '', s.act || '', s.note || '']));
+    return b64e(JSON.stringify({ v: 1, st: T.meta.days.map(d => S.mineStart[d.id]), m: S.members, d: days }));
+  }
+  function applyShare(code) {
+    const o = JSON.parse(b64d(code)); if (o.v !== 1 || !Array.isArray(o.d)) throw new Error('형식 오류');
+    T.meta.days.forEach((d, i) => {
+      S.mine[d.id] = (o.d[i] || []).map(a => ({ id: uid(), p: a[0] || undefined, title: a[1] || undefined, kind: a[2] || undefined, dur: a[3], fixed: a[4] || null, act: a[5] || '', note: a[6] || '' })).filter(s => !s.p || byId[s.p]);
+      S.mineStart[d.id] = (o.st && o.st[i]) || d.start;
+    });
+    if (o.m) S.members = o.m;
+    save(); renderAll();
+  }
+  $('#btn-share').addEventListener('click', async () => {
+    const has = Object.values(S.mine).some(d => d.length); if (!has) { toast('먼저 내 일정에 슬롯을 담아주세요'); return; }
+    const url = `${location.origin}${location.pathname}#mine/share=${sharePayload()}`;
+    if (url.length > 8000) toast('일정이 커서 일부 앱에서 링크가 잘릴 수 있어요 — JSON 내보내기를 함께 쓰세요');
+    try {
+      if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title: '서울 겨울 가족여행 일정', url }); return; }
+      await navigator.clipboard.writeText(url); toast('공유 링크를 복사했습니다 — 카톡에 붙여넣기');
+    } catch (e) { prompt('아래 링크를 복사하세요', url); }
+  });
+  function checkShareHash() {
+    const m = location.hash.match(/share=([A-Za-z0-9\-_]+)/); if (!m) return;
+    const has = Object.values(S.mine).some(d => d.length);
+    if (!has || confirm('공유받은 일정으로 내 일정을 바꿀까요? (현재 내용은 사라집니다)')) {
+      try { applyShare(m[1]); toast('공유받은 일정을 불러왔습니다'); } catch (e) { alert('링크를 해석할 수 없습니다: ' + e.message); }
+    }
+    history.replaceState(null, '', '#mine');
+  }
+
+  // PWA 서비스 워커 (파일 프로토콜에서는 건너뜀)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
   /* ---------- 지도 ---------- */
   let map, markersLayer, routeLayer, mapTypes = {};
   function showMap() {
@@ -463,5 +531,5 @@
 
   /* ---------- 초기화 ---------- */
   function renderAll() { renderHome(); renderPool(); renderPlans(); renderMine(); }
-  applyTheme(); renderAll(); route();
+  applyTheme(); renderAll(); checkShareHash(); route();
 })();

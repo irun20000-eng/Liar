@@ -250,6 +250,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 
 /* 내 일정 편집 */
+.slot .grip { cursor: grab; color: var(--muted); user-select: none; font-size: 1rem; letter-spacing: -2px; padding: 0 4px; touch-action: none; }
+.slot.dragging { opacity: .45; }
+.slot.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+.slot.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
 .slot .edit { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
 .slot .edit button, .slot .edit label { border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 8px; padding: 4px 8px; font: inherit; font-size: .76rem; cursor: pointer; }
 .slot .edit button:hover { border-color: var(--accent); color: var(--ink); }
