@@ -409,7 +409,7 @@
     $('#modal').hidden = false; document.body.style.overflow = 'hidden';
     $('#modal-card').dataset.pid = pid;
   }
-  function closeModals() { $('#modal').hidden = true; $('#picker').hidden = true; document.body.style.overflow = ''; }
+  function closeModals() { $('#modal').hidden = true; $('#picker').hidden = true; $('#links').hidden = true; document.body.style.overflow = ''; }
   document.addEventListener('click', e => {
     if (e.target.closest('[data-close]')) { closeModals(); return; }
     const o = e.target.closest('[data-open]'); if (o) { openDetail(o.dataset.open); return; }
@@ -600,7 +600,11 @@
   });
   function checkShareHash() {
     const rm = location.hash.match(/room=([A-Za-z0-9\-_]+)/);
-    if (rm) { try { SYNC.join(rm[1]); toast('가족방에 연결했습니다 — "나는 누구"를 골라주세요'); } catch (e) { alert('가족 링크를 해석할 수 없습니다: ' + e.message); } history.replaceState(null, '', '#home'); renderHome(); }
+    if (rm) {
+      const mm = location.hash.match(/[&/]me=(\w+)/); const mid = mm && T.members.find(m => m.id === mm[1]) ? mm[1] : '';
+      try { SYNC.join(rm[1]); if (mid) { S.sync.me = mid; save(); toast(`${memberName(T.members.find(m => m.id === mid))}(으)로 시작합니다`); } } catch (e) { alert('가족 링크를 해석할 수 없습니다: ' + e.message); }
+      history.replaceState(null, '', '#home'); renderHome();
+    }
     const m = location.hash.match(/share=([A-Za-z0-9\-_]+)/); if (!m) return;
     const has = Object.values(S.mine).some(d => d.length);
     if (!has || confirm('공유받은 일정으로 내 일정을 바꿀까요? (현재 내용은 사라집니다)')) {
@@ -802,7 +806,7 @@
       connect(kind, url);
     }
     const token = () => b64e(JSON.stringify({ k: S.sync.kind, u: S.sync.url }));
-    const link = () => `${location.origin}${location.pathname}#home/room=${token()}`;
+    const link = (mid) => `${location.origin}${location.pathname}#home/room=${token()}${mid ? '&me=' + mid : ''}`;
     function leave() { stop(); dirty.clear(); S.sync = Object.assign({}, S.sync, { kind: '', url: '', last: 0, err: '' }); save(); renderHome(); }
     const debug = () => ({ kind: S.sync.kind, url: S.sync.url, es: es ? es.readyState : null, poll: !!pollTimer, dirty: [...dirty], esFails, busy, last: S.sync.last, err: S.sync.err });
     return { start, stop, pull, push, markDirty, markAllDirty, schedulePush, createFirebaseRoom, join, link, leave, token, mode, debug };
@@ -813,6 +817,23 @@
     const el = $('#sync-status'); if (!el) return;
     if (!S.sync.url) { el.innerHTML = '<span class="dot off"></span> 이 기기에만 저장 중 — 아래 안내대로 Firebase 가족방을 만들면 서로의 찜이 실시간으로 보입니다'; return; }
     el.innerHTML = S.sync.err ? `<span class="dot err"></span> ${esc(S.sync.err)} · 자동 재시도 중` : `<span class="dot on"></span> 가족 공유 중 · ${SYNC.mode()} · 마지막 갱신 ${S.sync.last ? fmtAgo(S.sync.last) : '…'}`;
+  }
+  function renderWhoChip() {
+    const chip = $('#who-chip'); if (!chip) return;
+    if (!S.sync.url) { chip.hidden = true; return; }
+    chip.hidden = false; const m = T.members.find(x => x.id === S.sync.me);
+    chip.className = 'who-chip' + (m ? '' : ' none'); chip.textContent = m ? `${m.emoji} ${memberName(m)}` : '누구세요?';
+  }
+  function openWho(force) {
+    if (!S.sync.url) return; let skipped = false; try { skipped = !!sessionStorage.getItem('whoSkipped'); } catch (e) { /* ignore */ }
+    if (!force && (S.sync.me || skipped)) return;
+    $('#who-grid').innerHTML = T.members.map(m => `<button data-who="${m.id}" class="${S.sync.me === m.id ? 'on' : ''}"><span class="em">${m.emoji}</span><span class="nm">${esc(memberName(m))}</span><span class="sb">${esc(m.sub || (m.id === 'dad' ? '아빠' : m.id === 'mom' ? '엄마' : ''))}</span></button>`).join('');
+    $('#who').hidden = false; document.body.style.overflow = 'hidden';
+  }
+  function openLinks() {
+    $('#link-list').innerHTML = T.members.map(m => `<div class="row"><span class="em">${m.emoji}</span><b>${esc(memberName(m))} 전용 링크</b><button class="btn small primary" data-linkfor="${m.id}">복사·보내기</button></div>`).join('') +
+      `<div class="row common"><span class="em">👨‍👩‍👧‍👦</span><b>공통 링크 (열 때 "누구세요?" 선택)</b><button class="btn small" data-linkfor="">복사·보내기</button></div>`;
+    $('#links').hidden = false; document.body.style.overflow = 'hidden';
   }
   function renderSyncCard() {
     const el = $('#sync-card'); if (!el) return;
@@ -844,14 +865,18 @@
           </div>`}
       </div>
       ${feed ? `<h3 class="mt small-h">최근 찜 활동</h3><ul class="activity">${feed}</ul>` : ''}`;
-    renderSyncStatus();
+    renderSyncStatus(); renderWhoChip();
   }
   document.addEventListener('click', async e => {
     const me = e.target.closest('[data-me]'); if (me) { S.sync.me = S.sync.me === me.dataset.me ? '' : me.dataset.me; save(); renderSyncCard(); return; }
     if (e.target.id === 'fb-copy-rules') { try { await navigator.clipboard.writeText(FB_RULES); toast('규칙을 복사했습니다 — Firebase 규칙 탭에 붙여넣고 게시'); } catch (err) { prompt('아래 규칙을 복사하세요', FB_RULES); } return; }
-    if (e.target.id === 'fb-create') { const btn = e.target; btn.disabled = true; btn.textContent = '연결 중…'; try { await SYNC.createFirebaseRoom($('#fb-url').value, $('#fb-room').value); renderHome(); toast('가족방을 만들었습니다 — "가족 링크 복사"로 가족에게 보내세요'); } catch (err) { alert('가족방 만들기 실패: ' + err.message); btn.disabled = false; btn.textContent = '🔥 가족방 만들기'; } return; }
-    if (e.target.id === 'sync-join') { try { SYNC.join($('#sync-url').value); renderHome(); toast('연결했습니다'); } catch (err) { alert('연결 실패: ' + err.message); } return; }
-    if (e.target.id === 'sync-link') { const url = SYNC.link(); try { if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title: '서울 겨울 가족여행 — 가족방', url }); return; } await navigator.clipboard.writeText(url); toast('가족 링크를 복사했습니다'); } catch (err) { prompt('아래 링크를 복사하세요', url); } return; }
+    if (e.target.id === 'fb-create') { const btn = e.target; btn.disabled = true; btn.textContent = '연결 중…'; try { await SYNC.createFirebaseRoom($('#fb-url').value, $('#fb-room').value); renderHome(); toast('가족방을 만들었습니다 — "가족 링크 복사"로 가족에게 보내세요'); openWho(false); } catch (err) { alert('가족방 만들기 실패: ' + err.message); btn.disabled = false; btn.textContent = '🔥 가족방 만들기'; } return; }
+    if (e.target.id === 'sync-join') { try { SYNC.join($('#sync-url').value); renderHome(); toast('연결했습니다'); openWho(false); } catch (err) { alert('연결 실패: ' + err.message); } return; }
+    if (e.target.id === 'sync-link') { openLinks(); return; }
+    const lb = e.target.closest('[data-linkfor]'); if (lb) { const mid = lb.dataset.linkfor, m = T.members.find(x => x.id === mid); const url = SYNC.link(mid || ''); const title = m ? `${memberName(m)} 전용 가족방 링크` : '서울 겨울 가족여행 — 가족방 공통 링크'; try { if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title, text: title, url }); return; } await navigator.clipboard.writeText(url); toast(`${m ? memberName(m) + ' 전용' : '공통'} 링크를 복사했습니다`); } catch (err) { prompt('아래 링크를 복사하세요', url); } return; }
+    const wb = e.target.closest('#who-grid [data-who]'); if (wb) { S.sync.me = wb.dataset.who; save(); $('#who').hidden = true; document.body.style.overflow = ''; renderHome(); renderWhoChip(); toast(`${memberName(T.members.find(m => m.id === S.sync.me))}(으)로 시작합니다`); return; }
+    if (e.target.id === 'who-skip') { $('#who').hidden = true; document.body.style.overflow = ''; try { sessionStorage.setItem('whoSkipped', '1'); } catch (err) { /* ignore */ } renderWhoChip(); return; }
+    if (e.target.id === 'who-chip') { openWho(true); return; }
     if (e.target.id === 'sync-now') { SYNC.pull(true); toast('갱신 중…'); return; }
     if (e.target.id === 'sync-leave') { if (confirm('가족방 연결을 해제할까요? (찜은 이 기기에 남습니다)')) SYNC.leave(); return; }
   });
@@ -860,6 +885,6 @@
   /* ---------- 초기화 ---------- */
   function renderAll() { renderHome(); renderPool(); renderPlans(); renderMine(); }
   window.__trip = { debug: () => SYNC.debug(), state: () => S };
-  applyTheme(); renderAll(); checkShareHash(); route(); SYNC.start();
+  applyTheme(); renderAll(); checkShareHash(); route(); SYNC.start(); renderWhoChip(); openWho(false);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') SYNC.pull(); });
 })();

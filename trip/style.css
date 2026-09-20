@@ -205,6 +205,25 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .activity li:first-child { border-top: 0; }
 .vote-row button.me { border-width: 2px; font-weight: 700; }
 
+/* 누구세요 / 링크 */
+.who-chip { border: 1px solid var(--line); background: var(--accent-tint); color: var(--ink); height: 38px; border-radius: 999px; padding: 0 12px; font: inherit; font-size: .84rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.who-chip.none { background: var(--warn-tint); color: var(--warn); }
+.who-card { text-align: center; }
+.who-card h2 { font-size: 1.6rem; margin: 4px 0 6px; }
+.eyebrow-dark { font-size: .76rem; font-weight: 700; letter-spacing: .1em; color: var(--muted); margin: 0; }
+.who-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }
+@media (min-width: 620px) { .who-grid { grid-template-columns: repeat(3, 1fr); } }
+.who-grid button { border: 2px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 16px; padding: 16px 8px; font: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.who-grid button:hover { border-color: var(--accent); }
+.who-grid button.on { border-color: var(--accent); background: var(--accent-tint); }
+.who-grid .em { font-size: 2rem; line-height: 1; }
+.who-grid .nm { font-weight: 800; font-size: 1.05rem; }
+.who-grid .sb { font-size: .74rem; color: var(--muted); }
+.link-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.link-list .row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--surface-2); }
+.link-list .row b { flex: 1; }
+.link-list .row.common { background: var(--navy-tint); }
+
 /* 유형 탭 */
 .type-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
 .type-tabs::-webkit-scrollbar { display: none; }
