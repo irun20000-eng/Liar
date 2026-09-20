@@ -52,7 +52,7 @@
   <section id="view-home" class="view">
     <div class="hero">
       <div class="hero-main">
-        <p class="eyebrow">2027 겨울방학</p>
+        <p class="eyebrow">2027 겨울방학 <span id="dday" class="dday"></span></p>
         <h1>서울, 아이들 눈높이로<br>4박 5일</h1>
         <p class="lead">대전에서는 하기 어려운 공연·체험·박물관·명소를 모아, 상황별 추천 일정을 제안하고 직접 조합할 수 있게 만든 가족 여행 플래너입니다.</p>
         <div class="hero-facts">
@@ -90,6 +90,8 @@
           <li><b>겨울 한정 시설</b>(서울광장 스케이트장·뚝섬 눈썰매장·빛초롱축제)은 26-27 시즌 일정이 12월 초 발표됩니다.</li>
           <li><b>공연 라인업</b>(세종·샤롯데·국립극장·예술의전당)은 보통 10~11월 공개. "공연 슬롯"을 먼저 잡고 작품은 그때 결정하세요.</li>
           <li><b>토요일 오후 하행 고속도로</b>는 정체 — 1/23 귀가는 14시 전 출발 권장.</li>
+          <li><b>경기 관람</b>(롤파크 LCK·잠실 프로농구·장충 프로배구)은 12월 말에 1월 일정이 확정됩니다. 추천안 F는 "경기 슬롯"으로 잡아두고 대체안을 비고에 적어 뒀습니다.</li>
+          <li><b>귀가길 카드</b>(수원화성·에버랜드·한국민속촌)는 경부고속도로 길목이라 D4에 넣으면 서울 체류 시간을 줄이지 않고 하루를 더 씁니다.</li>
           <li>민통선·국회·청와대는 <b>전원 실물 신분증</b>. 아이들은 학생증 또는 주민등록초본/여권.</li>
         </ul>
       </section>
@@ -154,6 +156,7 @@
       <button data-f="k3">초3 추천</button>
       <button data-f="k1">중2 추천</button>
       <button data-f="voted">찜한 것만</button>
+      <button id="pool-clear" class="clear" hidden>✕ 필터 초기화</button>
     </div>
     <p class="muted small" id="pool-count"></p>
     <div class="cards" id="pool-cards"></div>
@@ -163,7 +166,7 @@
   <section id="view-plans" class="view" hidden>
     <div class="view-head">
       <h1>추천 일정</h1>
-      <p class="muted">상황별 5개 안. 모두 국립중앙박물관을 D1에 고정했고, 이동은 좌표 기반 추정치입니다(카카오맵으로 실측).</p>
+      <p class="muted">상황별 6개 안. 모두 국립중앙박물관을 D1에 고정했고, 이동은 좌표 기반 추정치입니다(카카오맵으로 실측). 카드의 비용은 5인 입장·체험·공연 합계(식비·숙박 제외)입니다.</p>
     </div>
     <div class="plan-picker" id="plan-picker"></div>
     <div class="plan-summary card" id="plan-summary"></div>
@@ -238,6 +241,7 @@
   </div>
 </div>
 
+<button class="to-top" id="btn-top" aria-label="맨 위로" hidden>↑</button>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
