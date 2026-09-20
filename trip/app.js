@@ -394,6 +394,7 @@
       <div class="modal-head"><div><h2>${esc(p.name)}</h2><div class="sub">📍 ${esc(regionById[p.region]?.label || '')} · ${typeChip(p)} ${statusChip(p)}</div></div><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
       ${p.status !== 'ok' && p.verifyNote ? `<p class="small" style="color:var(--verify)">⚠️ ${esc(p.verifyNote)}</p>` : ''}
       <div class="why">💡 <b>왜 여기?</b> ${esc(p.why)}</div>
+      ${voteRowHTML(pid)}
       <dl>
         <dt>소요</dt><dd>${p.dur ? '약 ' + p.dur + '분' : '—'}</dd>
         <dt>요금</dt><dd><b>5인 ${won(familyCost(p))}</b>${p.cost?.note ? ` · ${esc(p.cost.note)}` : ''}</dd>
@@ -416,7 +417,6 @@
         <a class="btn small" href="${kakaoTo(p)}" target="_blank" rel="noopener">🚗 길찾기</a>
         <a class="btn small" href="#map/${p.id}" data-close>🗺️ 지도에서</a>
       </div>
-      ${voteRowHTML(pid)}
       <div class="add-row"><span class="small muted">내 일정에 담기 →</span><select id="detail-day">${T.meta.days.map(d => `<option value="${d.id}" ${d.id === S.mineDay ? 'selected' : ''}>${d.label}</option>`).join('')}</select><button class="btn primary small" data-add="${pid}">＋ 추가</button></div>
       <div class="modal-foot"><button class="btn small" data-close>닫기</button></div>
     </div>`;
