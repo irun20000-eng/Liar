@@ -1,0 +1,16 @@
+{
+  "name": "서울 겨울 가족여행 플래너",
+  "short_name": "서울여행",
+  "description": "2027년 1월 대전 출발 서울 5인 가족여행 — 장소 풀, 추천 일정, 내 일정 빌더",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f2f5fa",
+  "theme_color": "#24406e",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

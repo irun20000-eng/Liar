@@ -1,9 +1,10 @@
 name: Deploy to GitHub Pages
 
-# 기본 브랜치에 푸시하면 자동 배포됩니다. 수동 실행도 가능합니다.
+# 아래 브랜치에 푸시하면 저장소 루트 전체(라이어 게임 + trip/ 여행 플래너)를 Pages에 배포합니다.
+# 주의: 저장소당 Pages 사이트는 1개라, 다른 브랜치의 배포 워크플로우와 같은 주소를 공유합니다(마지막 배포가 반영).
 on:
   push:
-    branches: ["claude/liar-game-discussion-0h9oi"]
+    branches: ["claude/liar-game-discussion-0h9oi", "claude/seoul-winter-trip-planner-wwd6v8"]
   workflow_dispatch:
 
 # Pages 배포에 필요한 권한
