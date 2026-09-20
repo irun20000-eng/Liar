@@ -225,10 +225,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .link-list .row.common { background: var(--navy-tint); }
 
 /* 찜 UI */
-.vote-me { border: 2px solid var(--warn); background: var(--surface); color: var(--warn); border-radius: 14px; padding: 10px 16px; font: inherit; font-size: 1rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-.vote-me small { font-weight: 600; font-size: .78rem; opacity: .8; }
-.vote-me.on { background: var(--warn); color: #fff; }
-.vote-me.ask { border-style: dashed; color: var(--navy); border-color: var(--navy); font-weight: 700; font-size: .9rem; }
+.vote-row .vote-me { border: 2px solid var(--warn); background: var(--surface); color: var(--warn); border-radius: 14px; padding: 10px 16px; font: inherit; font-size: 1rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.vote-row .vote-me small { font-weight: 600; font-size: .78rem; opacity: .8; }
+.vote-row .vote-me.on { background: var(--warn); color: #fff; }
+.vote-row .vote-me.ask { border-style: dashed; color: var(--navy); border-color: var(--navy); font-weight: 700; font-size: .9rem; }
 .likers { font-size: .84rem; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .likers span.me { color: var(--warn); font-weight: 700; }
 .vote-hint { flex-basis: 100%; font-size: .78rem; color: var(--muted); }
