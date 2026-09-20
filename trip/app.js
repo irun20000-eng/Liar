@@ -7,6 +7,7 @@
   const regionById = Object.fromEntries(T.regions.map(r => [r.id, r]));
   const dayById = Object.fromEntries(T.meta.days.map(d => [d.id, d]));
   const KEY = 'seoulTrip2027.v1';
+  const planIdsOf = {}; PLANS.forEach(pl => Object.values(pl.days).forEach(d => d.forEach(sl => { if (sl.p) (planIdsOf[sl.p] = planIdsOf[sl.p] || new Set()).add(pl.id); })));
 
   /* ---------- 유틸 ---------- */
   const $ = (s, el = document) => el.querySelector(s);
@@ -152,7 +153,7 @@
         </div>
         <textarea class="note-edit" data-i="${r.i}" data-field="note" placeholder="비고 (참고사항)">${esc(s.note || '')}</textarea>`;
       }
-      html += `<div class="slot ${kind}" data-slot="${r.i}">
+      html += `<div class="slot ${kind}" data-slot="${r.i}" ${p ? `style="--tc:${typeById[p.type].color}"` : ''}>
         <div class="time">${fmtT(r.start)}<small>~ ${fmtT(r.end)}</small><small>${r.dur}분</small></div>
         <div class="body">
           <div class="name">${grip}${name}${chips}</div>
@@ -235,6 +236,7 @@
       <div class="pcard-top"><div><h3>${esc(p.name)}</h3><div class="region">📍 ${esc(regionById[p.region]?.label || '')} · ${p.dur ? p.dur + '분' : '숙박'}</div></div>${statusChip(p)}</div>
       <p class="why">${esc(p.why)}</p>
       <div class="age-row"><span>중2 ${stars(p.ages.k1)}</span><span>초6 ${stars(p.ages.k2)}</span><span>초3 ${stars(p.ages.k3)}</span></div>
+      ${planIdsOf[p.id] ? `<div class="inplans">추천안 <b>${[...planIdsOf[p.id]].join(' · ')}</b>에 포함</div>` : ''}
       <div class="pcard-foot"><div class="chips">${typeChip(p)}${familyCost(p) === 0 && p.type !== 'stay' ? '<span class="chip free">무료</span>' : `<span class="chip">5인 ${won(familyCost(p))}</span>`}${p.reserve === 'required' ? '<span class="chip">예약</span>' : ''}${p.indoor === true ? '<span class="chip">실내</span>' : ''}</div>${voteCount(p.id) ? `<span class="hearts-mini">❤️ ${voteCount(p.id)}</span>` : ''}</div>
     </article>`;
   }
@@ -244,13 +246,14 @@
       .concat(T.types.map(t => `<button data-type="${t.id}" class="${S.poolType === t.id ? 'on' : ''}">${t.emoji} ${t.label} <b>${counts[t.id]}</b></button>`)).join('');
     const rs = $('#pool-region'); if (rs.options.length === 1) T.regions.forEach(r => rs.add(new Option(r.label, r.id)));
     rs.value = S.poolRegion; $('#pool-sort').value = S.poolSort;
-    $$('#pool-filters button').forEach(b => b.classList.toggle('on', !!S.poolFilters[b.dataset.f]));
+    $$('#pool-filters button[data-f]').forEach(b => b.classList.toggle('on', !!S.poolFilters[b.dataset.f]));
+    $('#pool-clear').hidden = !(Object.values(S.poolFilters).some(Boolean) || S.poolRegion || S.poolType || $('#pool-q').value);
     const list = poolList($('#pool-q').value, S.poolType, S.poolFilters, S.poolRegion, S.poolSort);
     $('#pool-count').textContent = `${list.length}개 표시 · 5인 비용은 성인2·청소년1·어린이2 기준 추정`;
     $('#pool-cards').innerHTML = list.map(cardHTML).join('') || '<p class="empty">조건에 맞는 장소가 없습니다.</p>';
   }
   $('#type-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.poolType = b.dataset.type; save(); renderPool(); });
-  $('#pool-filters').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.poolFilters[b.dataset.f] = !S.poolFilters[b.dataset.f]; save(); renderPool(); });
+  $('#pool-filters').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.id === 'pool-clear') { S.poolFilters = {}; S.poolRegion = ''; S.poolType = ''; $('#pool-q').value = ''; save(); renderPool(); return; } S.poolFilters[b.dataset.f] = !S.poolFilters[b.dataset.f]; save(); renderPool(); });
   $('#pool-q').addEventListener('input', renderPool);
   $('#pool-region').addEventListener('change', e => { S.poolRegion = e.target.value; save(); renderPool(); });
   $('#pool-sort').addEventListener('change', e => { S.poolSort = e.target.value; save(); renderPool(); });
@@ -279,6 +282,7 @@
       <div class="links">
         ${p.links?.official ? `<a class="btn small" href="${p.links.official}" target="_blank" rel="noopener">🔗 공식</a>` : ''}
         ${p.links?.booking ? `<a class="btn small" href="${p.links.booking}" target="_blank" rel="noopener">🎟️ 예약·예매</a>` : ''}
+        <a class="btn small" href="https://search.naver.com/search.naver?where=image&query=${encodeURIComponent(p.name.replace(/\s*\(.*$/, ''))}" target="_blank" rel="noopener">📷 사진 보기</a>
         <a class="btn small" href="${naverSearch(p)}" target="_blank" rel="noopener">🟢 네이버지도</a>
         <a class="btn small" href="${kakaoSearch(p)}" target="_blank" rel="noopener">🟡 카카오맵</a>
         <a class="btn small" href="${kakaoTo(p)}" target="_blank" rel="noopener">🚗 길찾기</a>
@@ -305,11 +309,16 @@
   /* ---------- 추천 일정 ---------- */
   function renderPlans() {
     const plan = PLANS.find(p => p.id === S.planId) || PLANS[0];
-    $('#plan-picker').innerHTML = PLANS.map(p => `<button class="plan-btn ${p.id === plan.id ? 'on' : ''}" data-plan="${p.id}"><b>${esc(p.name)}</b><span>${esc(p.tag)}</span></button>`).join('');
+    $('#plan-picker').innerHTML = PLANS.map(p => {
+      const cs = T.meta.days.map(d => computeDay(p.days[d.id] || [], d, d.start));
+      const entry = cs.reduce((a, c) => a + c.cost - c.foodCost, 0), n = cs.reduce((a, c) => a + c.nPlaces, 0);
+      const far = Object.values(p.days).some(d => d.some(sl => sl.p && ['far'].includes(byId[sl.p]?.type)));
+      return `<button class="plan-btn ${p.id === plan.id ? 'on' : ''}" data-plan="${p.id}"><b>${esc(p.name)}</b><span>${esc(p.tag)}</span><i>📍 ${n}곳 · 🎟️ ${won(entry)}${far ? ' · 🚗 원정 포함' : ''}</i></button>`;
+    }).join('');
     const stay = byId[plan.stay];
     const days = T.meta.days.map(d => computeDay(plan.days[d.id] || [], d, d.start));
     const total = days.reduce((a, c) => a + c.cost, 0), food = days.reduce((a, c) => a + c.foodCost, 0);
-    $('#plan-summary').innerHTML = `<h2>${esc(plan.name)}</h2><p class="fit">👨‍👩‍👧‍👦 이런 가족에게: ${esc(plan.fit)}</p><p>${esc(plan.summary)}</p><div class="kv"><span>🏨 숙소: <button class="link-btn" data-open="${stay.id}" style="border:0;background:none;padding:0;font:inherit;color:var(--navy);text-decoration:underline dotted;cursor:pointer">${esc(stay.name)}</button></span><span>🎟️ 입장·체험·공연 5인 <b>${won(total - food)}</b></span><span>🍜 식비 추정 <b>${won(food)}</b></span><span>💡 ${esc(plan.budgetHint)}</span></div>`;
+    $('#plan-summary').innerHTML = `<h2>${esc(plan.name)}</h2><p class="fit">👨‍👩‍👧‍👦 이런 가족에게: ${esc(plan.fit)}</p><p>${esc(plan.summary)}</p><div class="kv"><span>🏨 숙소: <button class="link-btn" data-open="${stay.id}">${esc(stay.name)}</button></span><span>🎟️ 입장·체험·공연 5인 <b>${won(total - food)}</b></span><span>🍜 식비 추정 <b>${won(food)}</b></span><span>💡 ${esc(plan.budgetHint)}</span></div>`;
     $('#plan-day-tabs').innerHTML = T.meta.days.map(d => `<button data-day="${d.id}" class="${d.id === S.planDay ? 'on' : ''}">${d.label}<small>${esc(d.hint)}</small></button>`).join('');
     $('#plan-days').innerHTML = T.meta.days.map(d => `<section class="day-panel" ${d.id === S.planDay ? '' : 'hidden'}><div class="day-head"><h2>${d.label}</h2><span class="hint">${esc(d.hint)}</span></div>${renderTimeline(plan.days[d.id] || [], d, d.start, false)}</section>`).join('');
     $('#btn-plan-map').href = `#map/plan-${plan.id}/${S.planDay}`;
@@ -528,6 +537,15 @@
       if (allPts.length) map.fitBounds(allPts, { padding: [40, 40] });
     } else if (!location.hash.split('/')[1]) fitAll();
   }
+
+  // D-day, 맨 위로
+  (function () {
+    const d = Math.ceil((new Date('2027-01-19T00:00:00+09:00') - Date.now()) / 86400000);
+    $('#dday').textContent = d > 0 ? `D-${d}` : d === 0 ? 'D-DAY' : `여행 후 ${-d}일`;
+    const top = $('#btn-top');
+    window.addEventListener('scroll', () => { top.hidden = window.scrollY < 600; }, { passive: true });
+    top.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  })();
 
   /* ---------- 초기화 ---------- */
   function renderAll() { renderHome(); renderPool(); renderPlans(); renderMine(); }

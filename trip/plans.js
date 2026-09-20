@@ -252,5 +252,55 @@ window.PLANS = [
         { t: '13:20', title: '대전 귀가', dur: 170, kind: 'move', act: '', note: '' }
       ]
     }
+  },
+
+  {
+    id: 'F', name: 'F. 스포츠·K-컬처 + 귀가길 수원',
+    tag: 'LCK · 프로농구 · 기술체험관 · 수원화성',
+    fit: '중2·초6이 게임·스포츠·전자기기에 열광할 때 · 귀가길도 여행으로 쓰고 싶을 때',
+    summary: '무료 기술체험관(티움·딜라이트)과 경기 관람(롤파크·잠실 농구)을 축으로, 마지막 날은 경부고속도로 길목의 수원화성에서 마무리. 경기 일정은 12월 확정이라 "슬롯"으로 잡아둠.',
+    stay: 'stay_yongsan',
+    budgetHint: '경기 티켓은 저렴하고 체험관은 무료 — 서울스카이·아쿠아리움이 비용의 절반',
+    days: {
+      d0: [
+        { t: '18:00', title: '대전 출발', dur: 150, kind: 'move', act: '', note: '' },
+        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인', note: '' },
+        { t: '21:15', p: 'yongridan', dur: 60, act: '숙소 근처 늦은 저녁·디저트', note: '피곤하면 배달로 대체' }
+      ],
+      d1: [
+        { t: '10:00', p: 'nmk', dur: 200, act: '사유의 방 → 실감영상관 → 어린이박물관(예약 회차)', note: '★ 필수. 수요일 야간개장' },
+        { t: '13:20', p: 'nmk_food', act: '점심', note: '' },
+        { t: '14:30', p: 'tum', act: '미래관 투어 (예약 회차)', note: '평일만 운영. 을지로입구역' },
+        { t: '16:10', p: 'hikr', dur: 80, act: 'K-pop 촬영 체험', note: '티움에서 도보 5분' },
+        { t: '17:30', p: 'lolpark', act: 'LCK 경기 관람 (경기 있는 날)', note: '★ 2027.1 일정 12월 확인. 경기 없으면 페인터즈 17:00로 대체' },
+        { t: '20:40', p: 'gwangjang', dur: 60, act: '늦은 저녁', note: '롤파크에서 도보 15분' }
+      ],
+      d2: [
+        { t: '09:40', p: 'assembly', dur: 80, act: '10:00 회차 참관', note: '신분증' },
+        { t: '11:15', p: 'kbson', act: '방송국 견학', note: '' },
+        { t: '12:45', p: 'hyundai_food', act: '점심 + 팝업', note: '' },
+        { t: '14:40', p: 'gyeongbok', dur: 100, act: '한복 + 궁 산책', note: '여의도→경복궁 30분' },
+        { t: '16:30', p: 'bukchon', dur: 60, act: '북촌 → 익선동', note: '' },
+        { t: '18:00', p: 'dakhanmari', act: '닭한마리 저녁', note: '' },
+        { t: '19:30', p: 'ddp', dur: 45, act: 'DDP 야경', note: '' }
+      ],
+      d3: [
+        { t: '10:00', p: 'dlight', act: '갤럭시·디스플레이 체험', note: '주차 1시간 무료' },
+        { t: '11:20', p: 'coex_aqua', act: '아쿠아리움', note: '' },
+        { t: '13:20', title: '코엑스몰 점심', dur: 60, kind: 'custom', act: '', note: '' },
+        { t: '14:30', p: 'starfield_lib', dur: 30, act: '별마당', note: '' },
+        { t: '15:10', title: '잠실 이동', dur: 25, kind: 'move', act: '', note: '' },
+        { t: '15:40', p: 'seoulsky', dur: 100, act: '일몰·야경', note: '' },
+        { t: '17:30', p: 'lwmall_food', act: '저녁', note: '' },
+        { t: '19:00', p: 'kbl', act: '프로농구 19:00 (잠실 홈경기일)', note: '★ 홈경기 없으면 아이스링크 or 샤롯데 뮤지컬' }
+      ],
+      d4: [
+        { t: '08:30', title: '체크아웃', dur: 30, kind: 'custom', act: '', note: '' },
+        { t: '09:00', title: '수원 이동 (경부고속도로)', dur: 60, kind: 'move', act: '', note: '토요일 오전 하행 원활' },
+        { t: '10:00', p: 'suwon_fortress', act: '행궁 → 화성어차 → 국궁 체험', note: '대안: 에버랜드 종일(18시 출발 → 20시 대전)' },
+        { t: '12:40', p: 'suwon_chicken', act: '통닭 점심', note: '' },
+        { t: '14:00', title: '대전 귀가', dur: 100, kind: 'move', act: '', note: '수원 → 대전 1시간 40분' }
+      ]
+    }
   }
 ];
