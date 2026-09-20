@@ -47,7 +47,7 @@
     theme: 'auto', vt: {}, mem: {}, checks: {}, sync: { kind: '', url: '', me: '', last: 0, err: '' },
     mine: Object.fromEntries(T.meta.days.map(d => [d.id, []])),
     mineStart: Object.fromEntries(T.meta.days.map(d => [d.id, d.start])),
-    planId: 'A', planDay: 'd1', mineDay: 'd1', poolType: '', poolFilters: {}, poolSort: 'rec', poolRegion: '',
+    homeSeg: 'dash', planId: 'A', planDay: 'd1', mineDay: 'd1', poolType: '', poolFilters: {}, poolSort: 'rec', poolRegion: '',
     roomMeta: {},
     budget: { stayId: 'stay_fraser', nightly: '', nights: 4, fuelEff: 12, fuelPrice: 1700, extraKm: 0, tolls: 20000, parkingPerDay: 15000, parkingDays: 3, mealB: 6000, mealL: 12000, mealD: 15000, snacks: 20000, reservePct: 10, scenario: 'base' }
   });
@@ -80,9 +80,18 @@
 
   /* ---------- 라우팅 ---------- */
   const TABS = ['home', 'pool', 'plans', 'mine', 'map'];
+  const HOME_SEGS = ['dash', 'family', 'prep', 'help'];
+  function renderHomeSeg() {
+    const seg = HOME_SEGS.includes(S.homeSeg) ? S.homeSeg : 'dash';
+    $$('#home-seg a').forEach(a => a.classList.toggle('on', a.dataset.seg === seg));
+    $$('.home-seg').forEach(el => { el.hidden = el.dataset.seg !== seg; });
+  }
   function route() {
-    let tab = (location.hash || '#home').slice(1).split('/')[0];
+    const parts = (location.hash || '#home').slice(1).split('/');
+    let tab = parts[0];
     if (!TABS.includes(tab)) tab = 'home';
+    if (tab === 'home' && HOME_SEGS.includes(parts[1])) { S.homeSeg = parts[1]; save(); }
+    if (tab === 'home') renderHomeSeg();
     TABS.forEach(t => { $(`#view-${t}`).hidden = t !== tab; });
     $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
     if (tab === 'map') showMap();
@@ -278,6 +287,18 @@
   }
 
   /* ---------- 개요 ---------- */
+  const BOOKING = [
+      { id: 'stay', when: '지금 ~ 11월', title: '숙소 예약 (5인 1실 · 주차 확인)', sub: '1순위 프레이저 플레이스 센트럴 서울 — 장소 풀 → 숙소 탭에서 10곳 비교, 4박 고정 권장' },
+      { id: 'lineup', when: '10~11월', title: '겨울방학 공연 라인업 확인 → 공연 1~2개 예매', sub: '세종문화회관 · 샤롯데씨어터 · 국립극장 · 예술의전당' },
+      { id: 'nanta', when: '11~12월', title: '난타 / 페인터즈 2027.1 일정 확인 후 예매', sub: '현재 확정 기간이 2026년 말까지라 연장 공지 확인' },
+      { id: 'season', when: '12월 초', title: '서울광장 스케이트장 · 뚝섬 눈썰매장 · 빛초롱축제 26-27 시즌 일정 확인', sub: '' },
+      { id: 'assembly', when: '10/22 이후 (90일 전)', title: '국회 참관 예약 (1/21 목 10:00 회차 등)', sub: '전원 신분증. 1/23(토)는 미운영' },
+      { id: 'nmk', when: '1/6 0시 (14일 전)', title: '★ 국립중앙박물관 어린이박물관 회차 예약 (1/20 수)', sub: '1인 최대 5매 — 딱 5인. 오픈 즉시' },
+      { id: 'kbs', when: '1/14까지 (5일 전)', title: 'KBS On 견학 예약', sub: '' },
+      { id: 'sky', when: '1/15 전후', title: '서울스카이 · 코엑스 아쿠아리움 온라인 할인권', sub: '날씨 보고 서울스카이 날짜 확정' },
+      { id: 'kids', when: '방문 2주 전', title: '어린이박물관류(전쟁기념관·민속박물관·세계문자박물관) 회차 예약', sub: '' },
+      { id: 'weather', when: '1/17~18', title: '주간 예보 확인 → 원정일(D2)·야외 슬롯 최종 확정', sub: '한파면 플랜 B 실내형으로 전환' }
+  ];
   const PACKING = ['핫팩 (1인 하루 2개 × 4일)', '방수 장갑 · 귀마개 · 목도리 (스케이트·눈썰매·루지 필수)', '전원 신분증 (국회·민통선·청와대) — 아이는 학생증/주민등록초본', '보조배터리 2개 (지도·예매 QR)', '접이식 우산 · 미끄럼 방지 신발', '차량: 스노체인 또는 윈터타이어 점검, 워셔액 동절기용', '멀미약 (강화·파주 원정)', '예매 확인 문자·QR 캡처 폴더', '아이 각자 작은 배낭 + 간식', '가족 찜 랭킹 인쇄본 (의사결정 분쟁 해결용)'];
 
   function renderHome() {
@@ -289,18 +310,7 @@
     const b = $('#mine-count'); b.textContent = mineN; b.hidden = !mineN;
 
     // 예약 캘린더
-    const items = [
-      { id: 'stay', when: '지금 ~ 11월', title: '숙소 예약 (5인 1실 · 주차 확인)', sub: '1순위 프레이저 플레이스 센트럴 서울 — 장소 풀 → 숙소 탭에서 10곳 비교, 4박 고정 권장' },
-      { id: 'lineup', when: '10~11월', title: '겨울방학 공연 라인업 확인 → 공연 1~2개 예매', sub: '세종문화회관 · 샤롯데씨어터 · 국립극장 · 예술의전당' },
-      { id: 'nanta', when: '11~12월', title: '난타 / 페인터즈 2027.1 일정 확인 후 예매', sub: '현재 확정 기간이 2026년 말까지라 연장 공지 확인' },
-      { id: 'season', when: '12월 초', title: '서울광장 스케이트장 · 뚝섬 눈썰매장 · 빛초롱축제 26-27 시즌 일정 확인', sub: '' },
-      { id: 'assembly', when: '10/22 이후 (90일 전)', title: '국회 참관 예약 (1/21 목 10:00 회차 등)', sub: '전원 신분증. 1/23(토)는 미운영' },
-      { id: 'nmk', when: '1/6 0시 (14일 전)', title: '★ 국립중앙박물관 어린이박물관 회차 예약 (1/20 수)', sub: '1인 최대 5매 — 딱 5인. 오픈 즉시' },
-      { id: 'kbs', when: '1/14까지 (5일 전)', title: 'KBS On 견학 예약', sub: '' },
-      { id: 'sky', when: '1/15 전후', title: '서울스카이 · 코엑스 아쿠아리움 온라인 할인권', sub: '날씨 보고 서울스카이 날짜 확정' },
-      { id: 'kids', when: '방문 2주 전', title: '어린이박물관류(전쟁기념관·민속박물관·세계문자박물관) 회차 예약', sub: '' },
-      { id: 'weather', when: '1/17~18', title: '주간 예보 확인 → 원정일(D2)·야외 슬롯 최종 확정', sub: '한파면 플랜 B 실내형으로 전환' }
-    ];
+    const items = BOOKING;
     $('#booking-list').innerHTML = items.map(it => `<li><input type="checkbox" data-check="b_${it.id}" ${S.checks['b_' + it.id] ? 'checked' : ''}><div class="${S.checks['b_' + it.id] ? 'done' : ''}"><span class="when">${esc(it.when)}</span>${esc(it.title)}${it.sub ? `<span class="sub">${esc(it.sub)}</span>` : ''}</div></li>`).join('');
     $('#packing-list').innerHTML = PACKING.map((t, i) => `<li><input type="checkbox" data-check="p_${i}" ${S.checks['p_' + i] ? 'checked' : ''}><div class="${S.checks['p_' + i] ? 'done' : ''}">${esc(t)}</div></li>`).join('');
 
@@ -312,8 +322,35 @@
     const ranked = T.places.filter(p => voteCount(p.id) > 0).sort((a, b) => voteCount(b.id) - voteCount(a.id) || a.name.localeCompare(b.name)).slice(0, 12);
     const me = S.sync.me, myCount = me ? T.places.filter(p => votedBy(p.id).includes(me)).length : 0, allCount = T.places.filter(p => voteCount(p.id) > 0).length;
     $('#rank-stats').textContent = allCount ? `가족 전체 ${allCount}곳${me ? ` · 내 찜 ${myCount}곳` : ''} · 많이 찜한 순` : '';
+    renderDash();
     $('#vote-ranking').innerHTML = ranked.length ? ranked.map(p => { const mine = me && votedBy(p.id).includes(me); return `<li class="${mine ? 'mine' : ''}"><button data-open="${p.id}">${esc(p.name)}</button>${mine ? '<span class="me-tag">나</span>' : ''}<span class="hearts">${votedBy(p.id).map(mid => { const m = T.members.find(x => x.id === mid); return m ? `<span title="${esc(memberName(m))}">${m.emoji}</span>` : '❤️'; }).join(' ')} · ${voteCount(p.id)}표</span></li>`; }).join('') : '<li class="muted">아직 찜한 장소가 없습니다. 장소 카드의 ♡ 를 누르거나 카드를 열어 찜해보세요.</li>';
   }
+  function renderDash() {
+    const el = $('#dash-tiles'); if (!el) return;
+    const me = S.sync.me, meM = T.members.find(m => m.id === me);
+    // 1) 가족방
+    const fam = S.sync.url
+      ? `<div class="tile good"><div class="tile-h"><span>👨‍👩‍👧‍👦 가족방</span><a href="#home/family">열기 ›</a></div><div class="tile-big">${meM ? `${meM.emoji} ${esc(memberName(meM))}` : '누구세요?'}</div><div class="tile-sub"><span class="dot ${S.sync.err ? 'err' : 'on'}"></span>${S.sync.err ? esc(S.sync.err) : '가족 공유 중 · ' + SYNC.mode()}</div>${meM ? `<a class="btn small" href="#home/family">🔗 가족 링크 보내기</a>` : `<button class="btn small primary" data-pickme>내 이름 고르기</button>`}</div>`
+      : `<div class="tile accent"><div class="tile-h"><span>👨‍👩‍👧‍👦 가족방</span><a href="#home/family">열기 ›</a></div><div class="tile-big">아직 없음</div><div class="tile-sub">Firebase 가족방을 만들면 각자 폰에서 찜한 내용이 실시간으로 모입니다</div><a class="btn small primary" href="#home/family">🔥 가족방 만들기</a></div>`;
+    // 2) 찜 TOP 3
+    const top = T.places.filter(p => voteCount(p.id) > 0).sort((a, b) => voteCount(b.id) - voteCount(a.id)).slice(0, 3);
+    const topT = `<div class="tile warn"><div class="tile-h"><span>❤️ 찜 TOP 3</span><a href="#home/family">전체 랭킹 ›</a></div>${top.length ? `<ul>${top.map(p => `<li><button class="link-btn n" data-open="${p.id}">${esc(p.name)}</button><span>${likersOf(p.id).map(m => m.emoji).join('')} ${voteCount(p.id)}</span></li>`).join('')}</ul>` : '<div class="tile-sub">아직 찜이 없어요. 장소 풀에서 ♡를 눌러보세요.</div>'}<a class="btn small" href="#pool">장소 찜하러 가기</a></div>`;
+    // 3) 내 일정
+    const nSlots = Object.values(S.mine).reduce((a, d) => a + d.filter(x => x.p).length, 0);
+    const B = computeBudget(S.mine, S.mineStart, S.budget.stayId, S.budget);
+    const warns = T.meta.days.reduce((a, d) => a + computeDay(S.mine[d.id], d, S.mineStart[d.id]).rows.reduce((b, r) => b + r.warns.length + (r.fixed && r.slack < -10 ? 1 : 0), 0), 0);
+    const mineT = nSlots
+      ? `<div class="tile navy"><div class="tile-h"><span>✏️ 내 일정</span><a href="#mine">열기 ›</a></div><div class="tile-big">${wonK(B.scen.base.total)}원</div><div class="tile-sub">장소 ${nSlots}곳 · 예상 총예산(기본) · 1인 ${wonK(B.scen.base.perPerson)}원${warns ? ` · <b style="color:var(--warn)">충돌 경고 ${warns}건</b>` : ' · 충돌 없음'}</div><a class="btn small" href="#mine">일정·예산 보기</a></div>`
+      : `<div class="tile navy"><div class="tile-h"><span>✏️ 내 일정</span><a href="#mine">열기 ›</a></div><div class="tile-big">비어 있음</div><div class="tile-sub">추천 일정 6개 안 중 하나를 복사해서 시작하면 편합니다</div><a class="btn small primary" href="#plans">추천 일정 고르기</a></div>`;
+    // 4) 다음 할 일 (예매 캘린더 미완료 3개)
+    const todo = BOOKING.filter(it => !S.checks['b_' + it.id]).slice(0, 3);
+    const todoT = `<div class="tile accent"><div class="tile-h"><span>📅 다음 할 일</span><a href="#home/prep">전체 ›</a></div>${todo.length ? `<ul>${todo.map(it => `<li><span class="n">${esc(it.title)}</span><span class="tile-sub" style="white-space:nowrap">${esc(it.when)}</span></li>`).join('')}</ul>` : '<div class="tile-sub">예매·예약 체크리스트를 모두 마쳤습니다 🎉</div>'}<a class="btn small" href="#home/prep">체크리스트</a></div>`;
+    // 5) 숙소·여행 정보
+    const stay = byId[S.budget.stayId];
+    const infoT = `<div class="tile"><div class="tile-h"><span>🏨 숙소 · 여행 정보</span><a href="#pool" data-go-stay>숙소 비교 ›</a></div><div class="tile-big" style="font-size:1.1rem">${stay ? esc(stay.name.replace(/\s*\(.*$/, '')) : '숙소 미선택'}</div><div class="tile-sub">${stay && stay.stay ? `1박 약 ${wonK(stay.stay.nightlyEst)}원 · ${Number(S.budget.nights) || 4}박` : ''} · 1/19(화) 저녁 출발 → 1/23(토) 귀가 · 5인 자차</div><a class="btn small" href="#pool" data-go-stay>숙소 10곳 비교</a></div>`;
+    el.innerHTML = fam + topT + mineT + todoT + infoT;
+  }
+  document.addEventListener('click', e => { const g = e.target.closest('[data-go-stay]'); if (g) { S.poolType = 'stay'; save(); renderPool(); } });
   $('#view-home').addEventListener('change', e => {
     if (e.target.dataset.check) { S.checks[e.target.dataset.check] = e.target.checked; save(); renderHome(); }
     if (e.target.dataset.member) { const mid = e.target.dataset.member; S.mem[mid] = { name: e.target.value.trim() || T.members.find(m => m.id === mid).name, ts: Date.now() }; save(); SYNC.markDirty(`mem/${mid}`); renderHome(); }
@@ -637,7 +674,7 @@
     if (rm) {
       const mm = location.hash.match(/[&/]me=(\w+)/); const mid = mm && T.members.find(m => m.id === mm[1]) ? mm[1] : '';
       try { SYNC.join(rm[1]); if (mid) { if (mid === ADMIN) setTimeout(() => chooseMe(mid), 1500); else chooseMe(mid); } } catch (e) { alert('가족 링크를 해석할 수 없습니다: ' + e.message); }
-      history.replaceState(null, '', '#home'); renderHome();
+      S.homeSeg = 'family'; save(); history.replaceState(null, '', '#home/family'); renderHome(); renderHomeSeg();
     }
     const m = location.hash.match(/share=([A-Za-z0-9\-_]+)/); if (!m) return;
     const has = Object.values(S.mine).some(d => d.length);
