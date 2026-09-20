@@ -55,15 +55,11 @@
       <div class="hero-main">
         <p class="eyebrow">2027 겨울방학 <span id="dday" class="dday"></span></p>
         <h1>서울, 아이들 눈높이로<br>4박 5일</h1>
-        <p class="lead">대전에서는 하기 어려운 공연·체험·박물관·명소를 모아, 상황별 추천 일정을 제안하고 직접 조합할 수 있게 만든 가족 여행 플래너입니다.</p>
+        <p class="lead">대전에서는 하기 어려운 공연·체험·박물관·명소를 모아, 상황별 추천 일정을 제안하고 가족이 함께 찜하며 직접 조합하는 여행 플래너입니다.</p>
         <div class="hero-facts">
           <div><b>일정</b><span>1/19(화) 저녁 출발 → 1/23(토) 귀가</span></div>
           <div><b>이동</b><span>자차 · 숙소 1곳 4박 고정 권장</span></div>
           <div><b>인원</b><span>중2 · 초6 · 초3 · 엄마 · 아빠</span></div>
-        </div>
-        <div class="hero-cta">
-          <a class="btn primary" href="#plans">추천 일정 보기</a>
-          <a class="btn" href="#pool">장소 풀 둘러보기</a>
         </div>
       </div>
       <div class="hero-side">
@@ -74,64 +70,100 @@
       </div>
     </div>
 
-    <div class="grid-2">
-      <section class="card">
-        <h2>📅 예매 · 예약 캘린더</h2>
-        <p class="muted small">예약이 필요한 장소를 오픈 시점 순으로 정리했습니다. 체크는 이 기기에 저장됩니다.</p>
-        <ul class="checklist" id="booking-list"></ul>
-      </section>
+    <nav class="seg" id="home-seg" aria-label="개요 하위 메뉴">
+      <a href="#home/dash" data-seg="dash">🏠 대시보드</a>
+      <a href="#home/family" data-seg="family">❤️ 가족방·찜</a>
+      <a href="#home/prep" data-seg="prep">📅 준비·예매</a>
+      <a href="#home/help" data-seg="help">🧭 도움말</a>
+    </nav>
 
-      <section class="card">
-        <h2>⚠️ 요일·시기 주의사항</h2>
-        <ul class="notes" id="caution-list">
-          <li><b>경복궁은 화요일 휴궁</b> — 1/19(화)은 불가, 1/20~23 가능. 덕수궁·창덕궁은 월요일 휴궁(여행기간 무관).</li>
-          <li><b>국회 참관</b>은 평일 정시 회차. 토요일은 매월 1·2·3주만 운영 → <b>1/23(넷째 토) 미운영</b>.</li>
-          <li><b>국립중앙박물관</b>은 수·토 21시 야간개장 → D1(수)에 배치하면 시간 여유.</li>
-          <li><b>국립한글박물관</b>은 화재 복구로 2028년까지 휴관 → 대안: 국립세계문자박물관(송도).</li>
-          <li><b>겨울 한정 시설</b>(서울광장 스케이트장·뚝섬 눈썰매장·빛초롱축제)은 26-27 시즌 일정이 12월 초 발표됩니다.</li>
-          <li><b>공연 라인업</b>(세종·샤롯데·국립극장·예술의전당)은 보통 10~11월 공개. "공연 슬롯"을 먼저 잡고 작품은 그때 결정하세요.</li>
-          <li><b>토요일 오후 하행 고속도로</b>는 정체 — 1/23 귀가는 14시 전 출발 권장.</li>
-          <li><b>경기 관람</b>(롤파크 LCK·잠실 프로농구·장충 프로배구)은 12월 말에 1월 일정이 확정됩니다. 추천안 F는 "경기 슬롯"으로 잡아두고 대체안을 비고에 적어 뒀습니다.</li>
-          <li><b>귀가길 카드</b>(수원화성·에버랜드·한국민속촌)는 경부고속도로 길목이라 D4에 넣으면 서울 체류 시간을 줄이지 않고 하루를 더 씁니다.</li>
-          <li>민통선·국회·청와대는 <b>전원 실물 신분증</b>. 아이들은 학생증 또는 주민등록초본/여권.</li>
-        </ul>
-      </section>
+    <!-- 대시보드 -->
+    <div class="home-seg" data-seg="dash">
+      <div class="quick">
+        <a class="quick-btn" href="#pool"><span class="q-ico">🗂️</span><b>장소 찜하기</b><small>104곳 둘러보기</small></a>
+        <a class="quick-btn" href="#plans"><span class="q-ico">🗓️</span><b>추천 일정</b><small>상황별 6개 안</small></a>
+        <a class="quick-btn" href="#mine"><span class="q-ico">✏️</span><b>내 일정</b><small>조합·예산</small></a>
+        <a class="quick-btn" href="#map"><span class="q-ico">🗺️</span><b>지도</b><small>동선 보기</small></a>
+      </div>
+      <div class="dash-grid" id="dash-tiles"></div>
     </div>
 
-    <div class="grid-2">
+    <!-- 가족방 · 찜 -->
+    <div class="home-seg" data-seg="family" hidden>
       <section class="card">
-        <h2>❤️ 우리 가족 찜 랭킹</h2>
-        <p class="muted small">장소 카드에서 각자 하트를 누르면 여기 합산됩니다. 가족방을 만들어 링크를 공유하면 각자 폰에서 찜한 내용이 몇 초 안에 서로에게 반영됩니다.</p>
+        <h2>👨‍👩‍👧‍👦 가족방 <small>각자 폰에서 찜한 내용이 실시간으로 모입니다</small></h2>
         <div id="sync-card" class="sync-box"></div>
-        <p class="muted small" style="margin-top:12px">이름 바꾸기</p>
-        <div class="members-edit" id="members-edit"></div>
-        <p class="small muted" id="rank-stats"></p>
-        <ol class="ranking" id="vote-ranking"></ol>
       </section>
-
-      <section class="card">
-        <h2>🧣 겨울 서울 준비물</h2>
-        <ul class="checklist" id="packing-list"></ul>
-        <h3 class="mt">🚗 자차 팁</h3>
-        <ul class="notes small">
-          <li>도심(광화문·명동·북촌)은 주차 협소·혼잡 — 숙소에 차를 두고 지하철·도보가 빠릅니다. 차는 <b>용산·잠실·여의도·원정일</b>에.</li>
-          <li>서울 공영주차장은 대부분 카드 결제. 5인승 승용차 기준 백화점·몰 주차는 구매 금액에 따라 무료 시간.</li>
-          <li>강화·파주·인천 원정은 출근 시간(07:30~09:00) 전에 서울을 빠져나가면 30분 절약.</li>
-        </ul>
-      </section>
+      <div class="grid-2">
+        <section class="card">
+          <h2>❤️ 찜 랭킹 <small>많이 찜한 순</small></h2>
+          <p class="small muted" id="rank-stats"></p>
+          <ol class="ranking" id="vote-ranking"></ol>
+        </section>
+        <section class="card">
+          <h2>✏️ 이름 바꾸기 <small>바꾸면 가족 모두에게 반영</small></h2>
+          <div class="members-edit" id="members-edit"></div>
+        </section>
+      </div>
     </div>
 
-    <section class="card">
-      <h2>🧭 이 플래너 사용법</h2>
-      <ol class="howto">
-        <li><b>장소 풀</b>에서 유형별로 둘러보고 검색·필터로 좁힙니다. 카드를 열면 운영시간·요금·예약·주차·비고와 지도 링크가 있습니다.</li>
-        <li><b>추천 일정</b> 5개 안 중 상황에 맞는 것을 고르고, "내 일정으로 복사"로 가져옵니다.</li>
-        <li><b>내 일정</b>에서 순서를 바꾸고 장소를 추가·삭제하면 이동시간·종료시각·예산이 자동 계산되고, 휴무·운영시간 충돌은 경고로 표시됩니다.</li>
-        <li><b>지도</b>에서 일자별 동선을 확인하고, 카드의 카카오맵 버튼으로 실제 길찾기를 합니다.</li>
-        <li>완성되면 <b>공유 링크</b>로 가족 카톡방에 보내거나(링크 하나에 일정 전체가 담깁니다), <b>JSON 내보내기</b>·<b>인쇄</b>로 챙기세요. 홈 화면에 추가하면 앱처럼 열리고 한 번 연 뒤에는 오프라인에서도 동작합니다(지도 제외).</li>
-      </ol>
-      <p class="muted small">정보 기준: 2026년 9월 조사. 카드의 <span class="chip verify">확인 필요</span> 표시는 2027년 1월 운영·요금·라인업이 확정되지 않은 항목이며, 공식 링크로 재확인이 필요합니다. 좌표는 지도 표시용 근사값입니다.</p>
-    </section>
+    <!-- 준비 · 예매 -->
+    <div class="home-seg" data-seg="prep" hidden>
+      <div class="grid-2">
+        <section class="card">
+          <h2>📅 예매 · 예약 캘린더 <small>오픈 시점 순 · 체크는 이 기기에 저장</small></h2>
+          <ul class="checklist" id="booking-list"></ul>
+        </section>
+        <section class="card">
+          <h2>⚠️ 요일·시기 주의사항</h2>
+          <ul class="notes" id="caution-list">
+            <li><b>경복궁은 화요일 휴궁</b> — 1/19(화)은 불가, 1/20~23 가능. 덕수궁·창덕궁은 월요일 휴궁(여행기간 무관).</li>
+            <li><b>국회 참관</b>은 평일 정시 회차. 토요일은 매월 1·2·3주만 운영 → <b>1/23(넷째 토) 미운영</b>.</li>
+            <li><b>국립중앙박물관</b>은 수·토 21시 야간개장 → D1(수)에 배치하면 시간 여유.</li>
+            <li><b>국립한글박물관</b>은 화재 복구로 2028년까지 휴관 → 대안: 국립세계문자박물관(송도).</li>
+            <li><b>겨울 한정 시설</b>(서울광장 스케이트장·뚝섬 눈썰매장·빛초롱축제)은 26-27 시즌 일정이 12월 초 발표됩니다.</li>
+            <li><b>공연 라인업</b>(세종·샤롯데·국립극장·예술의전당)은 보통 10~11월 공개. "공연 슬롯"을 먼저 잡고 작품은 그때 결정하세요.</li>
+            <li><b>토요일 오후 하행 고속도로</b>는 정체 — 1/23 귀가는 14시 전 출발 권장.</li>
+            <li><b>경기 관람</b>(롤파크 LCK·잠실 프로농구·장충 프로배구)은 12월 말에 1월 일정이 확정됩니다. 추천안 F는 "경기 슬롯"으로 잡아두고 대체안을 비고에 적어 뒀습니다.</li>
+            <li><b>귀가길 카드</b>(수원화성·에버랜드·한국민속촌)는 경부고속도로 길목이라 D4에 넣으면 서울 체류 시간을 줄이지 않고 하루를 더 씁니다.</li>
+            <li>민통선·국회·청와대는 <b>전원 실물 신분증</b>. 아이들은 학생증 또는 주민등록초본/여권.</li>
+          </ul>
+        </section>
+      </div>
+      <div class="grid-2">
+        <section class="card">
+          <h2>🧣 겨울 서울 준비물</h2>
+          <ul class="checklist" id="packing-list"></ul>
+        </section>
+        <section class="card">
+          <h2>🚗 자차 팁</h2>
+          <ul class="notes">
+            <li>도심(광화문·명동·북촌)은 주차 협소·혼잡 — 숙소에 차를 두고 지하철·도보가 빠릅니다. 차는 <b>용산·잠실·여의도·원정일</b>에.</li>
+            <li>서울 공영주차장은 대부분 카드 결제. 5인승 승용차 기준 백화점·몰 주차는 구매 금액에 따라 무료 시간.</li>
+            <li>강화·파주·인천 원정은 출근 시간(07:30~09:00) 전에 서울을 빠져나가면 30분 절약.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+
+    <!-- 도움말 -->
+    <div class="home-seg" data-seg="help" hidden>
+      <section class="card">
+        <h2>🧭 이 플래너 사용법</h2>
+        <ol class="howto">
+          <li><b>장소 풀</b>에서 유형별로 둘러보고 검색·필터로 좁힙니다. 카드의 ♡로 바로 찜하거나, 카드를 열면 운영시간·요금·예약·주차·비고와 지도 링크가 있습니다.</li>
+          <li><b>추천 일정</b> 6개 안 중 상황에 맞는 것을 고르고, "내 일정으로 복사"로 가져옵니다.</li>
+          <li><b>내 일정</b>에서 순서를 바꾸고 장소를 추가·삭제하면 이동시간·종료시각·예산이 자동 계산되고, 휴무·운영시간 충돌은 경고로 표시됩니다.</li>
+          <li><b>지도</b>에서 일자별 동선을 확인하고, 카드의 카카오맵 버튼으로 실제 길찾기를 합니다.</li>
+          <li><b>가족방</b>을 만들어 링크를 보내면 각자 폰에서 자기 이름으로 찜하고, 몇 초 안에 서로에게 반영됩니다. 운영자(아빠)만 다른 가족의 찜을 고칠 수 있습니다.</li>
+          <li>완성되면 <b>공유 링크</b>로 가족 카톡방에 보내거나, <b>JSON 내보내기</b>·<b>인쇄</b>로 챙기세요. 홈 화면에 추가하면 앱처럼 열리고 한 번 연 뒤에는 오프라인에서도 동작합니다(지도 제외).</li>
+        </ol>
+      </section>
+      <section class="card">
+        <h2>ℹ️ 정보 기준</h2>
+        <p class="muted small">2026년 9월 조사. 카드의 <span class="chip verify">확인 필요</span> 표시는 2027년 1월 운영·요금·라인업이 확정되지 않은 항목이며, 공식 링크로 재확인이 필요합니다. 좌표는 지도 표시용 근사값이고 이동시간은 추정치입니다. 모든 데이터는 이 기기 브라우저와(가족방 사용 시) 가족 Firebase 방에만 저장됩니다.</p>
+      </section>
+    </div>
   </section>
 
   <!-- ===== 장소 풀 ===== -->
