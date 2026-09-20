@@ -241,6 +241,11 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .ranking .me-tag { font-size: .68rem; background: var(--warn); color: #fff; border-radius: 999px; padding: 1px 6px; font-weight: 700; }
 .modal-foot { margin-top: 14px; text-align: center; }
 
+.admin-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 10px; }
+.admin-row .small { flex-basis: 100%; }
+.admin-row button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 10px; font: inherit; font-size: .8rem; cursor: pointer; color: var(--muted); }
+.admin-row button.on { border-color: var(--warn); color: var(--warn); background: var(--warn-tint); font-weight: 700; }
+
 /* 유형 탭 */
 .type-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
 .type-tabs::-webkit-scrollbar { display: none; }
