@@ -18,9 +18,8 @@ window.TRIP = {
       { id: 'd3', date: '2027-01-22', dow: '금', label: 'D3 · 1/22(금)', hint: '마지막 온전한 하루', start: '09:00' },
       { id: 'd4', date: '2027-01-23', dow: '토', label: 'D4 · 1/23(토)', hint: '오전 일정 → 대전 귀가', start: '09:30' }
     ],
-    home: { name: '대전(출발·귀가)', lat: 36.3504, lng: 127.3845 },
-    // 가족 실시간 공유 기본 저장소 (설정 없이 사용 가능한 공개 JSON 저장소). Firebase 등 직접 주소도 연결 가능
-    syncProviders: { jsonblob: { create: 'https://jsonblob.com/api/jsonBlob', label: 'jsonblob (설정 없음)' } }
+    home: { name: '대전(출발·귀가)', lat: 36.3504, lng: 127.3845 }
+    // 가족 실시간 공유: Firebase Realtime Database 주소를 개요 탭에서 입력해 방을 만듦 (app.js SYNC)
   },
 
   members: [
