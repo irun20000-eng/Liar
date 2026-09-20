@@ -48,6 +48,7 @@
     mine: Object.fromEntries(T.meta.days.map(d => [d.id, []])),
     mineStart: Object.fromEntries(T.meta.days.map(d => [d.id, d.start])),
     planId: 'A', planDay: 'd1', mineDay: 'd1', poolType: '', poolFilters: {}, poolSort: 'rec', poolRegion: '',
+    roomMeta: {},
     budget: { stayId: 'stay_fraser', nightly: '', nights: 4, fuelEff: 12, fuelPrice: 1700, extraKm: 0, tolls: 20000, parkingPerDay: 15000, parkingDays: 3, mealB: 6000, mealL: 12000, mealD: 15000, snacks: 20000, reservePct: 10, scenario: 'base' }
   });
   let S = defaults();
@@ -55,7 +56,10 @@
   // 구버전(votes 배열 · members 이름) → vt/mem 마이그레이션
   if (S.votes && !Object.keys(S.vt || {}).length) { S.vt = {}; Object.entries(S.votes).forEach(([pid, arr]) => (arr || []).forEach(mid => { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: true, ts: 1 }; })); }
   if (S.members && !Object.keys(S.mem || {}).length) { S.mem = {}; Object.entries(S.members).forEach(([mid, name]) => { if (name) S.mem[mid] = { name, ts: 1 }; }); }
-  delete S.votes; delete S.members; S.vt = S.vt || {}; S.mem = S.mem || {};
+  delete S.votes; delete S.members; S.vt = S.vt || {}; S.mem = S.mem || {}; S.roomMeta = S.roomMeta || {};
+  const ADMIN = 'dad';
+  const isAdmin = () => S.sync.me === ADMIN;
+  async function sha(str) { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('trip:' + str)); return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join(''); }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } };
   const memberName = m => (S.mem[m.id] && S.mem[m.id].name) || m.name;
   const votedBy = pid => Object.entries(S.vt[pid] || {}).filter(([, v]) => v.on).map(([mid]) => mid);
@@ -382,7 +386,11 @@
   function voteRowHTML(pid) {
     const me = S.sync.me, meM = T.members.find(m => m.id === me), likers = likersOf(pid);
     const likersHtml = `<span class="likers">${likers.length ? '가족 찜 · ' + likers.map(m => `<span class="${m.id === me ? 'me' : ''}">${m.emoji} ${esc(memberName(m))}</span>`).join(' ') : '아직 찜한 가족이 없어요'}</span>`;
-    if (meM) { const on = votedBy(pid).includes(me); return `<div class="vote-row"><button class="vote-me ${on ? 'on' : ''}" data-vote="${me}">${on ? '❤️ 찜했어요' : '♡ 찜하기'}<small>${meM.emoji} ${esc(memberName(meM))}</small></button>${likersHtml}</div>`; }
+    if (meM) {
+      const on = votedBy(pid).includes(me);
+      const adminRow = isAdmin() ? `<div class="admin-row"><span class="small muted">운영자 편집 · 가족 찜 켜기/끄기</span>${T.members.filter(m => m.id !== me).map(m => { const o = votedBy(pid).includes(m.id); return `<button data-avote="${m.id}" class="${o ? 'on' : ''}">${m.emoji} ${esc(memberName(m))} ${o ? '❤️' : '♡'}</button>`; }).join('')}</div>` : '';
+      return `<div class="vote-row"><button class="vote-me ${on ? 'on' : ''}" data-vote="${me}">${on ? '❤️ 찜했어요' : '♡ 찜하기'}<small>${meM.emoji} ${esc(memberName(meM))}</small></button>${likersHtml}</div>${adminRow}`;
+    }
     if (S.sync.url) return `<div class="vote-row"><button class="vote-me ask" data-pickme>♡ 찜하기 — 먼저 내가 누구인지 골라주세요</button>${likersHtml}</div>`;
     return `<div class="vote-row">${T.members.map(m => { const on = votedBy(pid).includes(m.id); return `<button data-vote="${m.id}" class="${on ? 'on' : ''}">${m.emoji} ${esc(memberName(m))} ${on ? '❤️' : '♡'}</button>`; }).join('')}<span class="vote-hint">한 기기에서 함께 쓰는 중 — 가족방을 만들면 각자 폰에서 자기 이름으로만 찜합니다</span></div>`;
   }
@@ -437,6 +445,7 @@
     const q = e.target.closest('[data-qvote]'); if (q) { e.preventDefault(); const pid = q.dataset.qvote, me = S.sync.me; if (!me) { openWho(true); return; } setVote(pid, me, !votedBy(pid).includes(me)); renderPool(); renderHome(); return; }
     if (e.target.closest('[data-pickme]')) { openWho(true); return; }
     const o = e.target.closest('[data-open]'); if (o) { openDetail(o.dataset.open); return; }
+    const av = e.target.closest('[data-avote]'); if (av) { if (!isAdmin()) { toast('운영자(아빠)만 다른 가족의 찜을 바꿀 수 있어요'); return; } const pid = $('#modal-card').dataset.pid, mid = av.dataset.avote; setVote(pid, mid, !votedBy(pid).includes(mid)); openDetail(pid); renderHome(); renderPool(); return; }
     const v = e.target.closest('[data-vote]'); if (v) {
       const pid = $('#modal-card').dataset.pid, mid = v.dataset.vote;
       if (S.sync.me && mid !== S.sync.me) { toast('내 이름으로만 찜할 수 있어요'); return; }
@@ -627,7 +636,7 @@
     const rm = location.hash.match(/room=([A-Za-z0-9\-_]+)/);
     if (rm) {
       const mm = location.hash.match(/[&/]me=(\w+)/); const mid = mm && T.members.find(m => m.id === mm[1]) ? mm[1] : '';
-      try { SYNC.join(rm[1]); if (mid) { S.sync.me = mid; save(); toast(`${memberName(T.members.find(m => m.id === mid))}(으)로 시작합니다`); } } catch (e) { alert('가족 링크를 해석할 수 없습니다: ' + e.message); }
+      try { SYNC.join(rm[1]); if (mid) { if (mid === ADMIN) setTimeout(() => chooseMe(mid), 1500); else chooseMe(mid); } } catch (e) { alert('가족 링크를 해석할 수 없습니다: ' + e.message); }
       history.replaceState(null, '', '#home'); renderHome();
     }
     const m = location.hash.match(/share=([A-Za-z0-9\-_]+)/); if (!m) return;
@@ -738,6 +747,7 @@
         else if ((l.ts || 0) > (r.ts || 0)) newer.push(`vt/${pid}/${mid}`);
       }
       for (const mid in rm) { const r = rm[mid]; if (!r || typeof r !== 'object') continue; const l = S.mem[mid]; if (!l || (r.ts || 0) > (l.ts || 0)) { S.mem[mid] = { name: String(r.name || ''), ts: r.ts || 0 }; changed = true; } else if ((l.ts || 0) > (r.ts || 0)) newer.push(`mem/${mid}`); }
+      const ra = remote && remote.admin; if (ra && typeof ra === 'object') { if ((ra.ts || 0) > (S.roomMeta.ts || 0)) { S.roomMeta = { pinHash: ra.pinHash || '', ts: ra.ts || 0 }; changed = true; } else if ((S.roomMeta.ts || 0) > (ra.ts || 0)) newer.push('admin'); }
       return { changed, newer, isFull: !!remote };
     }
     // 전체 문서(초기 put)와 비교해 서버에 없는 로컬 셀을 찾음
@@ -745,9 +755,10 @@
       const out = []; const rv = (remote && remote.vt) || {}, rm = (remote && remote.mem) || {};
       for (const pid in S.vt) for (const mid in S.vt[pid]) if (!(rv[pid] && rv[pid][mid])) out.push(`vt/${pid}/${mid}`);
       for (const mid in S.mem) if (!rm[mid]) out.push(`mem/${mid}`);
+      if (S.roomMeta.ts && !(remote && remote.admin)) out.push('admin');
       return out;
     }
-    function afterChange(changed) { save(); if (changed) { renderHome(); renderPool(); if ($('#modal').hidden === false && $('#modal-card').dataset.pid) openDetail($('#modal-card').dataset.pid); } else renderSyncStatus(); }
+    function afterChange(changed) { save(); if (changed) { renderHome(); renderPool(); if ($('#modal').hidden === false && $('#modal-card').dataset.pid) openDetail($('#modal-card').dataset.pid); if ($('#who').hidden === false) renderWhoGrid(); } else renderSyncStatus(); }
     async function req(method, body) {
       const r = await fetch(S.sync.url, { method, headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
       if (r.status === 401 || r.status === 403) throw new Error('권한 없음 — Firebase 규칙(.read/.write)을 확인하세요');
@@ -756,7 +767,7 @@
     }
     function patchBody() {
       const body = {};
-      dirty.forEach(p => { const s = p.split('/'); if (s[0] === 'vt') { const c = S.vt[s[1]] && S.vt[s[1]][s[2]]; if (c) body[p] = c; } else if (s[0] === 'mem' && S.mem[s[1]]) body[p] = S.mem[s[1]]; });
+      dirty.forEach(p => { const s = p.split('/'); if (s[0] === 'vt') { const c = S.vt[s[1]] && S.vt[s[1]][s[2]]; if (c) body[p] = c; } else if (s[0] === 'mem' && S.mem[s[1]]) body[p] = S.mem[s[1]]; else if (p === 'admin' && S.roomMeta.ts) body.admin = S.roomMeta; });
       body.updatedAt = now(); return body;
     }
     async function push() {
@@ -770,7 +781,7 @@
     }
     function schedulePush() { if (!S.sync.url) return; clearTimeout(pushTimer); pushTimer = setTimeout(push, 400); }
     function markDirty(path) { if (!S.sync.url) return; dirty.add(path); schedulePush(); }
-    function markAllDirty() { Object.entries(S.vt).forEach(([pid, ms]) => Object.keys(ms).forEach(mid => dirty.add(`vt/${pid}/${mid}`))); Object.keys(S.mem).forEach(mid => dirty.add(`mem/${mid}`)); }
+    function markAllDirty() { Object.entries(S.vt).forEach(([pid, ms]) => Object.keys(ms).forEach(mid => dirty.add(`vt/${pid}/${mid}`))); Object.keys(S.mem).forEach(mid => dirty.add(`mem/${mid}`)); if (S.roomMeta.ts) dirty.add('admin'); }
     async function pull(force) {
       if (!S.sync.url || busy) return; busy = true;
       try { const remote = await req('GET'); const m = merge(remote || {}); m.newer.concat(missingRemote(remote)).forEach(p => dirty.add(p)); S.sync.last = now(); S.sync.err = ''; afterChange(m.changed || force); }
@@ -832,7 +843,7 @@
     }
     const token = () => b64e(JSON.stringify({ k: S.sync.kind, u: S.sync.url }));
     const link = (mid) => `${location.origin}${location.pathname}#home/room=${token()}${mid ? '&me=' + mid : ''}`;
-    function leave() { stop(); dirty.clear(); S.sync = Object.assign({}, S.sync, { kind: '', url: '', last: 0, err: '' }); save(); renderHome(); }
+    function leave() { stop(); dirty.clear(); S.sync = Object.assign({}, S.sync, { kind: '', url: '', last: 0, err: '', adminOk: '' }); S.roomMeta = {}; save(); renderHome(); }
     const debug = () => ({ kind: S.sync.kind, url: S.sync.url, es: es ? es.readyState : null, poll: !!pollTimer, dirty: [...dirty], esFails, busy, last: S.sync.last, err: S.sync.err });
     return { start, stop, pull, push, markDirty, markAllDirty, schedulePush, createFirebaseRoom, join, link, leave, token, mode, debug };
   })();
@@ -843,17 +854,36 @@
     if (!S.sync.url) { el.innerHTML = '<span class="dot off"></span> 이 기기에만 저장 중 — 아래 안내대로 Firebase 가족방을 만들면 서로의 찜이 실시간으로 보입니다'; return; }
     el.innerHTML = S.sync.err ? `<span class="dot err"></span> ${esc(S.sync.err)} · 자동 재시도 중` : `<span class="dot on"></span> 가족 공유 중 · ${SYNC.mode()} · 마지막 갱신 ${S.sync.last ? fmtAgo(S.sync.last) : '…'}`;
   }
+  async function chooseMe(mid, opts) {
+    opts = opts || {};
+    if (mid === ADMIN && S.sync.url && S.roomMeta.pinHash && S.sync.adminOk !== S.roomMeta.pinHash) {
+      const pin = prompt('운영자(아빠) PIN을 입력하세요'); if (pin == null) return false;
+      const h = await sha(pin.trim()); if (h !== S.roomMeta.pinHash) { toast('PIN이 맞지 않습니다'); return false; }
+      S.sync.adminOk = h;
+    }
+    S.sync.me = mid; save(); renderHome(); renderPool(); renderWhoChip();
+    if (!opts.silent) toast(`${memberName(T.members.find(m => m.id === mid))}(으)로 시작합니다`);
+    return true;
+  }
+  async function setAdminPin() {
+    if (!S.sync.url) { toast('먼저 가족방을 만들어 주세요'); return; }
+    const pin = prompt(S.roomMeta.pinHash ? '새 운영자 PIN (숫자 4~6자리). 비우면 취소' : '운영자(아빠) PIN을 정하세요 (숫자 4~6자리). 앞으로 "아빠"를 고를 때 이 PIN을 묻습니다');
+    if (!pin) return; if (!/^\d{4,6}$/.test(pin.trim())) { alert('숫자 4~6자리로 입력하세요'); return; }
+    const h = await sha(pin.trim()); S.roomMeta = { pinHash: h, ts: Date.now() }; S.sync.adminOk = h; save(); SYNC.markDirty('admin'); renderSyncCard(); toast('운영자 PIN을 설정했습니다');
+  }
   function renderWhoChip() {
     const chip = $('#who-chip'); if (!chip) return;
     if (!S.sync.url && !S.sync.me) { chip.hidden = true; return; }
     chip.hidden = false; const m = T.members.find(x => x.id === S.sync.me);
     chip.className = 'who-chip' + (m ? '' : ' none'); chip.textContent = m ? `${m.emoji} ${memberName(m)}` : '누구세요?';
   }
+  function renderWhoGrid() {
+    $('#who-grid').innerHTML = T.members.map(m => `<button data-who="${m.id}" class="${S.sync.me === m.id ? 'on' : ''}"><span class="em">${m.emoji}</span><span class="nm">${esc(memberName(m))}</span><span class="sb">${esc(m.sub || (m.id === 'dad' ? '아빠' : m.id === 'mom' ? '엄마' : ''))}${m.id === ADMIN ? (S.roomMeta.pinHash ? ' · 🔒 운영자' : ' · 운영자') : ''}</span></button>`).join('');
+  }
   function openWho(force) {
     if (!S.sync.url && !force) return; let skipped = false; try { skipped = !!sessionStorage.getItem('whoSkipped'); } catch (e) { /* ignore */ }
     if (!force && (S.sync.me || skipped)) return;
-    $('#who-grid').innerHTML = T.members.map(m => `<button data-who="${m.id}" class="${S.sync.me === m.id ? 'on' : ''}"><span class="em">${m.emoji}</span><span class="nm">${esc(memberName(m))}</span><span class="sb">${esc(m.sub || (m.id === 'dad' ? '아빠' : m.id === 'mom' ? '엄마' : ''))}</span></button>`).join('');
-    showOverlay('#who');
+    renderWhoGrid(); showOverlay('#who');
   }
   function openLinks() {
     $('#link-list').innerHTML = T.members.map(m => `<div class="row"><span class="em">${m.emoji}</span><b>${esc(memberName(m))} 전용 링크</b><button class="btn small primary" data-linkfor="${m.id}">복사·보내기</button></div>`).join('') +
@@ -873,7 +903,7 @@
       <div class="me-row"><span class="small muted">나는</span><div class="me-chips">${meChips}</div></div>
       <p class="sync-status" id="sync-status"></p>
       <div class="sync-actions">${connected
-        ? `<button class="btn small primary" id="sync-link">🔗 가족 링크 복사</button><button class="btn small" id="sync-now">🔄 지금 갱신</button><button class="btn small danger" id="sync-leave">연결 해제</button>${room ? `<span class="small muted">방 이름: <b>${esc(room)}</b></span>` : ''}`
+        ? `<button class="btn small primary" id="sync-link">🔗 가족 링크 복사</button><button class="btn small" id="sync-now">🔄 지금 갱신</button><button class="btn small danger" id="sync-leave">연결 해제</button>${(isAdmin() || !S.roomMeta.pinHash) ? `<button class="btn small" id="admin-pin">${S.roomMeta.pinHash ? '🔒 운영자 PIN 변경' : '🔒 운영자(아빠) PIN 설정'}</button>` : '<span class="small muted">🔒 운영자 PIN 설정됨</span>'}${room ? `<span class="small muted">방 이름: <b>${esc(room)}</b></span>` : ''}`
         : `<div class="fb-guide">
             <b>🔥 Firebase로 가족방 만들기 (무료 · 약 5분, 한 사람만 하면 됩니다)</b>
             <ol>
@@ -893,13 +923,14 @@
     renderSyncStatus(); renderWhoChip();
   }
   document.addEventListener('click', async e => {
-    const me = e.target.closest('[data-me]'); if (me) { S.sync.me = S.sync.me === me.dataset.me ? '' : me.dataset.me; save(); renderSyncCard(); return; }
+    const me = e.target.closest('[data-me]'); if (me) { if (S.sync.me === me.dataset.me) { S.sync.me = ''; save(); renderSyncCard(); renderWhoChip(); } else chooseMe(me.dataset.me, { silent: true }); return; }
+    if (e.target.id === 'admin-pin') { setAdminPin(); return; }
     if (e.target.id === 'fb-copy-rules') { try { await navigator.clipboard.writeText(FB_RULES); toast('규칙을 복사했습니다 — Firebase 규칙 탭에 붙여넣고 게시'); } catch (err) { prompt('아래 규칙을 복사하세요', FB_RULES); } return; }
     if (e.target.id === 'fb-create') { const btn = e.target; btn.disabled = true; btn.textContent = '연결 중…'; try { await SYNC.createFirebaseRoom($('#fb-url').value, $('#fb-room').value); renderHome(); toast('가족방을 만들었습니다 — "가족 링크 복사"로 가족에게 보내세요'); openWho(false); } catch (err) { alert('가족방 만들기 실패: ' + err.message); btn.disabled = false; btn.textContent = '🔥 가족방 만들기'; } return; }
     if (e.target.id === 'sync-join') { try { SYNC.join($('#sync-url').value); renderHome(); toast('연결했습니다'); openWho(false); } catch (err) { alert('연결 실패: ' + err.message); } return; }
     if (e.target.id === 'sync-link') { openLinks(); return; }
     const lb = e.target.closest('[data-linkfor]'); if (lb) { const mid = lb.dataset.linkfor, m = T.members.find(x => x.id === mid); const url = SYNC.link(mid || ''); const title = m ? `${memberName(m)} 전용 가족방 링크` : '서울 겨울 가족여행 — 가족방 공통 링크'; try { if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title, text: title, url }); return; } await navigator.clipboard.writeText(url); toast(`${m ? memberName(m) + ' 전용' : '공통'} 링크를 복사했습니다`); } catch (err) { prompt('아래 링크를 복사하세요', url); } return; }
-    const wb = e.target.closest('#who-grid [data-who]'); if (wb) { S.sync.me = wb.dataset.who; save(); hideOverlays(false); renderHome(); renderPool(); renderWhoChip(); toast(`${memberName(T.members.find(m => m.id === S.sync.me))}(으)로 시작합니다`); return; }
+    const wb = e.target.closest('#who-grid [data-who]'); if (wb) { chooseMe(wb.dataset.who).then(ok => { if (ok) hideOverlays(false); }); return; }
     if (e.target.id === 'who-skip') { hideOverlays(false); try { sessionStorage.setItem('whoSkipped', '1'); } catch (err) { /* ignore */ } renderWhoChip(); return; }
     if (e.target.closest('[data-pickme]')) { openWho(true); return; }
     if (e.target.id === 'who-chip') { openWho(true); return; }
