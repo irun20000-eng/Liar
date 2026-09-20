@@ -276,11 +276,53 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .day-start { display: flex; gap: 8px; align-items: center; font-size: .86rem; color: var(--muted); }
 .day-start input { padding: 4px 8px; }
 .empty { padding: 28px 16px; text-align: center; color: var(--muted); }
-.budget { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-@media (min-width: 620px) { .budget { grid-template-columns: repeat(4, 1fr); } }
-.budget div { text-align: center; }
-.budget b { display: block; font-size: 1.25rem; color: var(--navy); }
-.budget span { font-size: .76rem; color: var(--muted); }
+/* 예산 계산기 */
+.budget-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.budget-head h2 { margin: 0; }
+.scen { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.scen button { border: 0; background: var(--surface); color: var(--muted); font: inherit; font-size: .82rem; font-weight: 700; padding: 6px 14px; cursor: pointer; }
+.scen button.on { background: var(--navy); color: #fff; }
+.budget-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0 14px; }
+@media (min-width: 620px) { .budget-tiles { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 960px) { .budget-tiles { grid-template-columns: repeat(6, 1fr); } }
+.budget-tiles div { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px; text-align: center; }
+.budget-tiles div.total { background: var(--navy); color: #fff; border-color: var(--navy); }
+.budget-tiles b { display: block; font-size: 1.1rem; }
+.budget-tiles span { font-size: .72rem; opacity: .8; }
+.budget-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.budget-table th, .budget-table td { padding: 7px 8px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.budget-table th:first-child, .budget-table td:first-child { text-align: left; white-space: normal; min-width: 150px; }
+@media (min-width: 620px) { .budget-table th:first-child, .budget-table td:first-child { min-width: 220px; } }
+.budget-table thead th { border-top: 0; color: var(--muted); font-weight: 600; font-size: .78rem; }
+.budget-table tr.sub td { font-weight: 700; background: var(--surface-2); }
+.budget-table tr.total td { font-weight: 800; font-size: .95rem; color: var(--navy); border-top: 2px solid var(--navy); }
+.budget-table td.on, .budget-table th.on { background: var(--accent-tint); }
+.budget-table .sub-note { display: block; font-size: .74rem; color: var(--muted); font-weight: 400; }
+.budget-table .bar { display: inline-block; height: 6px; background: var(--navy); border-radius: 3px; vertical-align: middle; margin-left: 6px; opacity: .55; }
+.table-wrap { overflow-x: auto; margin: 6px -4px; padding: 0 4px; }
+details.bset { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.bset summary { cursor: pointer; font-weight: 700; font-size: .92rem; color: var(--navy); }
+.bset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 10px; }
+@media (min-width: 860px) { .bset-grid { grid-template-columns: repeat(4, 1fr); } }
+.bset-grid label { display: flex; flex-direction: column; gap: 3px; font-size: .78rem; color: var(--muted); }
+.bset-grid input, .bset-grid select { padding: 6px 8px; font-size: .86rem; }
+.bset-grid label.wide { grid-column: 1 / -1; }
+.budget-note { font-size: .78rem; color: var(--muted); margin-top: 8px; }
+
+/* 숙소 비교표 */
+.stay-table { width: 100%; border-collapse: collapse; font-size: .82rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.stay-table th, .stay-table td { padding: 8px 10px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.stay-table thead th { border-top: 0; background: var(--surface-2); color: var(--muted); font-size: .76rem; white-space: nowrap; }
+.stay-table td.name { font-weight: 700; min-width: 180px; }
+.stay-table td.num { text-align: right; white-space: nowrap; }
+.stay-table tr.sel td { background: var(--accent-tint); }
+.stay-table button { font: inherit; font-size: .76rem; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; color: var(--navy); white-space: nowrap; }
+.stay-table button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.stay-wrap { overflow-x: auto; margin-bottom: 14px; }
+.detail .stay-box { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; margin: 10px 0; font-size: .88rem; }
+.detail .stay-box ul { margin: 4px 0 0; padding-left: 1.1em; }
+.detail .stay-box .pc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.detail .stay-box .pc b { display: block; font-size: .8rem; }
 
 /* 지도 */
 .map { height: 62vh; min-height: 380px; border-radius: var(--radius); border: 1px solid var(--line); box-shadow: var(--shadow); z-index: 1; }
