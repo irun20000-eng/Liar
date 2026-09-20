@@ -306,7 +306,9 @@
 
     // 랭킹
     const ranked = T.places.filter(p => voteCount(p.id) > 0).sort((a, b) => voteCount(b.id) - voteCount(a.id) || a.name.localeCompare(b.name)).slice(0, 12);
-    $('#vote-ranking').innerHTML = ranked.length ? ranked.map(p => `<li><button data-open="${p.id}">${esc(p.name)}</button><span class="hearts">${votedBy(p.id).map(mid => { const m = T.members.find(x => x.id === mid); return m ? `<span title="${esc(memberName(m))}">${m.emoji}</span>` : '❤️'; }).join(' ')} · ${voteCount(p.id)}표</span></li>`).join('') : '<li class="muted">아직 찜한 장소가 없습니다. 장소 카드를 열어 하트를 눌러보세요.</li>';
+    const me = S.sync.me, myCount = me ? T.places.filter(p => votedBy(p.id).includes(me)).length : 0, allCount = T.places.filter(p => voteCount(p.id) > 0).length;
+    $('#rank-stats').textContent = allCount ? `가족 전체 ${allCount}곳${me ? ` · 내 찜 ${myCount}곳` : ''} · 많이 찜한 순` : '';
+    $('#vote-ranking').innerHTML = ranked.length ? ranked.map(p => { const mine = me && votedBy(p.id).includes(me); return `<li class="${mine ? 'mine' : ''}"><button data-open="${p.id}">${esc(p.name)}</button>${mine ? '<span class="me-tag">나</span>' : ''}<span class="hearts">${votedBy(p.id).map(mid => { const m = T.members.find(x => x.id === mid); return m ? `<span title="${esc(memberName(m))}">${m.emoji}</span>` : '❤️'; }).join(' ')} · ${voteCount(p.id)}표</span></li>`; }).join('') : '<li class="muted">아직 찜한 장소가 없습니다. 장소 카드의 ♡ 를 누르거나 카드를 열어 찜해보세요.</li>';
   }
   $('#view-home').addEventListener('change', e => {
     if (e.target.dataset.check) { S.checks[e.target.dataset.check] = e.target.checked; save(); renderHome(); }
@@ -324,6 +326,7 @@
     if (filters.k3) list = list.filter(p => p.ages.k3 >= 3);
     if (filters.k1) list = list.filter(p => p.ages.k1 >= 3);
     if (filters.voted) list = list.filter(p => voteCount(p.id) > 0);
+    if (filters.mine) list = list.filter(p => S.sync.me && votedBy(p.id).includes(S.sync.me));
     const typeOrder = Object.fromEntries(T.types.map((t, i) => [t.id, i]));
     const score = p => (p.type === 'must' ? 100 : 0) + p.ages.k1 + p.ages.k2 + p.ages.k3;
     const sorters = {
@@ -337,12 +340,14 @@
   }
   function cardHTML(p) {
     const t = typeById[p.type];
-    return `<article class="pcard" style="--tc:${t.color}" data-open="${p.id}" tabindex="0" role="button">
+    const me = S.sync.me, myOn = me && votedBy(p.id).includes(me), likers = likersOf(p.id);
+    const qh = me ? `<button class="qheart ${myOn ? 'on' : ''}" data-qvote="${p.id}" aria-label="내 찜" title="내 찜">${myOn ? '❤️' : '♡'}</button>` : (S.sync.url ? `<button class="qheart" data-pickme aria-label="찜하려면 내 이름 선택" title="찜하려면 내 이름 선택">♡</button>` : '');
+    return `<article class="pcard" style="--tc:${t.color}" data-open="${p.id}" tabindex="0" role="button">${qh}
       <div class="pcard-top"><div><h3>${esc(p.name)}</h3><div class="region">📍 ${esc(regionById[p.region]?.label || '')} · ${p.dur ? p.dur + '분' : '숙박'}</div></div>${statusChip(p)}</div>
       <p class="why">${esc(p.why)}</p>
       <div class="age-row"><span>중2 ${stars(p.ages.k1)}</span><span>초6 ${stars(p.ages.k2)}</span><span>초3 ${stars(p.ages.k3)}</span></div>
       ${planIdsOf[p.id] ? `<div class="inplans">추천안 <b>${[...planIdsOf[p.id]].join(' · ')}</b>에 포함</div>` : ''}
-      <div class="pcard-foot"><div class="chips">${typeChip(p)}${familyCost(p) === 0 && p.type !== 'stay' ? '<span class="chip free">무료</span>' : `<span class="chip">5인 ${won(familyCost(p))}</span>`}${p.reserve === 'required' ? '<span class="chip">예약</span>' : ''}${p.indoor === true ? '<span class="chip">실내</span>' : ''}</div>${voteCount(p.id) ? `<span class="hearts-mini">❤️ ${voteCount(p.id)}</span>` : ''}</div>
+      <div class="pcard-foot"><div class="chips">${typeChip(p)}${familyCost(p) === 0 && p.type !== 'stay' ? '<span class="chip free">무료</span>' : `<span class="chip">5인 ${won(familyCost(p))}</span>`}${p.reserve === 'required' ? '<span class="chip">예약</span>' : ''}${p.indoor === true ? '<span class="chip">실내</span>' : ''}</div>${likers.length ? `<span class="hearts-mini" title="${esc(likers.map(m => memberName(m)).join(', '))}"><span class="likers-mini">${likers.map(m => m.emoji).join('')}</span> ${likers.length}</span>` : ''}</div>
     </article>`;
   }
   function renderPool() {
@@ -373,6 +378,14 @@
   $('#pool-sort').addEventListener('change', e => { S.poolSort = e.target.value; save(); renderPool(); });
 
   /* ---------- 상세 모달 ---------- */
+  const likersOf = pid => votedBy(pid).map(mid => T.members.find(m => m.id === mid)).filter(Boolean);
+  function voteRowHTML(pid) {
+    const me = S.sync.me, meM = T.members.find(m => m.id === me), likers = likersOf(pid);
+    const likersHtml = `<span class="likers">${likers.length ? '가족 찜 · ' + likers.map(m => `<span class="${m.id === me ? 'me' : ''}">${m.emoji} ${esc(memberName(m))}</span>`).join(' ') : '아직 찜한 가족이 없어요'}</span>`;
+    if (meM) { const on = votedBy(pid).includes(me); return `<div class="vote-row"><button class="vote-me ${on ? 'on' : ''}" data-vote="${me}">${on ? '❤️ 찜했어요' : '♡ 찜하기'}<small>${meM.emoji} ${esc(memberName(meM))}</small></button>${likersHtml}</div>`; }
+    if (S.sync.url) return `<div class="vote-row"><button class="vote-me ask" data-pickme>♡ 찜하기 — 먼저 내가 누구인지 골라주세요</button>${likersHtml}</div>`;
+    return `<div class="vote-row">${T.members.map(m => { const on = votedBy(pid).includes(m.id); return `<button data-vote="${m.id}" class="${on ? 'on' : ''}">${m.emoji} ${esc(memberName(m))} ${on ? '❤️' : '♡'}</button>`; }).join('')}<span class="vote-hint">한 기기에서 함께 쓰는 중 — 가족방을 만들면 각자 폰에서 자기 이름으로만 찜합니다</span></div>`;
+  }
   function openDetail(pid) {
     const p = byId[pid]; if (!p) return;
     const inPlans = PLANS.filter(pl => Object.values(pl.days).some(d => d.some(s => s.p === pid))).map(pl => pl.id);
@@ -381,6 +394,7 @@
       <div class="modal-head"><div><h2>${esc(p.name)}</h2><div class="sub">📍 ${esc(regionById[p.region]?.label || '')} · ${typeChip(p)} ${statusChip(p)}</div></div><button class="icon-btn" data-close aria-label="닫기">✕</button></div>
       ${p.status !== 'ok' && p.verifyNote ? `<p class="small" style="color:var(--verify)">⚠️ ${esc(p.verifyNote)}</p>` : ''}
       <div class="why">💡 <b>왜 여기?</b> ${esc(p.why)}</div>
+      ${voteRowHTML(pid)}
       <dl>
         <dt>소요</dt><dd>${p.dur ? '약 ' + p.dur + '분' : '—'}</dd>
         <dt>요금</dt><dd><b>5인 ${won(familyCost(p))}</b>${p.cost?.note ? ` · ${esc(p.cost.note)}` : ''}</dd>
@@ -403,18 +417,29 @@
         <a class="btn small" href="${kakaoTo(p)}" target="_blank" rel="noopener">🚗 길찾기</a>
         <a class="btn small" href="#map/${p.id}" data-close>🗺️ 지도에서</a>
       </div>
-      <div class="vote-row">${T.members.slice().sort((a, b) => (b.id === S.sync.me) - (a.id === S.sync.me)).map(m => { const on = votedBy(pid).includes(m.id), mine = m.id === S.sync.me; return `<button data-vote="${m.id}" class="${on ? 'on' : ''} ${mine ? 'me' : ''}">${mine ? '나 · ' : ''}${m.emoji} ${esc(memberName(m))} ${on ? '❤️' : '♡'}</button>`; }).join('')}${!S.sync.me ? '<span class="small muted">개요 탭에서 "나는 누구"를 고르면 내 버튼이 앞에 옵니다</span>' : ''}</div>
       <div class="add-row"><span class="small muted">내 일정에 담기 →</span><select id="detail-day">${T.meta.days.map(d => `<option value="${d.id}" ${d.id === S.mineDay ? 'selected' : ''}>${d.label}</option>`).join('')}</select><button class="btn primary small" data-add="${pid}">＋ 추가</button></div>
+      <div class="modal-foot"><button class="btn small" data-close>닫기</button></div>
     </div>`;
-    $('#modal').hidden = false; document.body.style.overflow = 'hidden';
+    showOverlay('#modal');
     $('#modal-card').dataset.pid = pid;
   }
-  function closeModals() { $('#modal').hidden = true; $('#picker').hidden = true; $('#links').hidden = true; document.body.style.overflow = ''; }
+  const OVERLAYS = ['#modal', '#picker', '#links', '#who'];
+  function showOverlay(sel) { const el = $(sel); if (!el || !el.hidden) return; el.hidden = false; document.body.style.overflow = 'hidden'; try { history.pushState({ overlay: sel }, ''); } catch (e) { /* ignore */ } }
+  function hideOverlays(fromHistory) {
+    let any = false; OVERLAYS.forEach(sel => { const el = $(sel); if (el && !el.hidden) { el.hidden = true; any = true; } });
+    document.body.style.overflow = '';
+    if (any && !fromHistory && history.state && history.state.overlay) { try { history.back(); } catch (e) { /* ignore */ } }
+  }
+  window.addEventListener('popstate', () => hideOverlays(true));
+  function closeModals(fromHistory) { hideOverlays(!!fromHistory); }
   document.addEventListener('click', e => {
-    if (e.target.closest('[data-close]')) { closeModals(); return; }
+    const cl = e.target.closest('[data-close]'); if (cl) { closeModals(cl.tagName === 'A' && cl.getAttribute('href')); return; }
+    const q = e.target.closest('[data-qvote]'); if (q) { e.preventDefault(); const pid = q.dataset.qvote, me = S.sync.me; if (!me) { openWho(true); return; } setVote(pid, me, !votedBy(pid).includes(me)); renderPool(); renderHome(); return; }
+    if (e.target.closest('[data-pickme]')) { openWho(true); return; }
     const o = e.target.closest('[data-open]'); if (o) { openDetail(o.dataset.open); return; }
     const v = e.target.closest('[data-vote]'); if (v) {
       const pid = $('#modal-card').dataset.pid, mid = v.dataset.vote;
+      if (S.sync.me && mid !== S.sync.me) { toast('내 이름으로만 찜할 수 있어요'); return; }
       setVote(pid, mid, !votedBy(pid).includes(mid)); openDetail(pid); renderHome(); renderPool(); return;
     }
     const a = e.target.closest('[data-add]'); if (a) { addPlace(a.dataset.add, $('#detail-day').value); closeModals(); return; }
@@ -529,7 +554,7 @@
   function openPicker() {
     pickerDay = S.mineDay;
     const ts = $('#picker-type'); if (ts.options.length === 1) T.types.forEach(t => ts.add(new Option(`${t.emoji} ${t.label}`, t.id)));
-    $('#picker').hidden = false; document.body.style.overflow = 'hidden'; renderPicker(); setTimeout(() => $('#picker-q').focus(), 50);
+    showOverlay('#picker'); renderPicker(); setTimeout(() => $('#picker-q').focus(), 50);
   }
   function renderPicker() {
     const list = poolList($('#picker-q').value, $('#picker-type').value, {}, '', 'rec');
@@ -820,20 +845,20 @@
   }
   function renderWhoChip() {
     const chip = $('#who-chip'); if (!chip) return;
-    if (!S.sync.url) { chip.hidden = true; return; }
+    if (!S.sync.url && !S.sync.me) { chip.hidden = true; return; }
     chip.hidden = false; const m = T.members.find(x => x.id === S.sync.me);
     chip.className = 'who-chip' + (m ? '' : ' none'); chip.textContent = m ? `${m.emoji} ${memberName(m)}` : '누구세요?';
   }
   function openWho(force) {
-    if (!S.sync.url) return; let skipped = false; try { skipped = !!sessionStorage.getItem('whoSkipped'); } catch (e) { /* ignore */ }
+    if (!S.sync.url && !force) return; let skipped = false; try { skipped = !!sessionStorage.getItem('whoSkipped'); } catch (e) { /* ignore */ }
     if (!force && (S.sync.me || skipped)) return;
     $('#who-grid').innerHTML = T.members.map(m => `<button data-who="${m.id}" class="${S.sync.me === m.id ? 'on' : ''}"><span class="em">${m.emoji}</span><span class="nm">${esc(memberName(m))}</span><span class="sb">${esc(m.sub || (m.id === 'dad' ? '아빠' : m.id === 'mom' ? '엄마' : ''))}</span></button>`).join('');
-    $('#who').hidden = false; document.body.style.overflow = 'hidden';
+    showOverlay('#who');
   }
   function openLinks() {
     $('#link-list').innerHTML = T.members.map(m => `<div class="row"><span class="em">${m.emoji}</span><b>${esc(memberName(m))} 전용 링크</b><button class="btn small primary" data-linkfor="${m.id}">복사·보내기</button></div>`).join('') +
       `<div class="row common"><span class="em">👨‍👩‍👧‍👦</span><b>공통 링크 (열 때 "누구세요?" 선택)</b><button class="btn small" data-linkfor="">복사·보내기</button></div>`;
-    $('#links').hidden = false; document.body.style.overflow = 'hidden';
+    showOverlay('#links');
   }
   function renderSyncCard() {
     const el = $('#sync-card'); if (!el) return;
@@ -874,8 +899,9 @@
     if (e.target.id === 'sync-join') { try { SYNC.join($('#sync-url').value); renderHome(); toast('연결했습니다'); openWho(false); } catch (err) { alert('연결 실패: ' + err.message); } return; }
     if (e.target.id === 'sync-link') { openLinks(); return; }
     const lb = e.target.closest('[data-linkfor]'); if (lb) { const mid = lb.dataset.linkfor, m = T.members.find(x => x.id === mid); const url = SYNC.link(mid || ''); const title = m ? `${memberName(m)} 전용 가족방 링크` : '서울 겨울 가족여행 — 가족방 공통 링크'; try { if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title, text: title, url }); return; } await navigator.clipboard.writeText(url); toast(`${m ? memberName(m) + ' 전용' : '공통'} 링크를 복사했습니다`); } catch (err) { prompt('아래 링크를 복사하세요', url); } return; }
-    const wb = e.target.closest('#who-grid [data-who]'); if (wb) { S.sync.me = wb.dataset.who; save(); $('#who').hidden = true; document.body.style.overflow = ''; renderHome(); renderWhoChip(); toast(`${memberName(T.members.find(m => m.id === S.sync.me))}(으)로 시작합니다`); return; }
-    if (e.target.id === 'who-skip') { $('#who').hidden = true; document.body.style.overflow = ''; try { sessionStorage.setItem('whoSkipped', '1'); } catch (err) { /* ignore */ } renderWhoChip(); return; }
+    const wb = e.target.closest('#who-grid [data-who]'); if (wb) { S.sync.me = wb.dataset.who; save(); hideOverlays(false); renderHome(); renderPool(); renderWhoChip(); toast(`${memberName(T.members.find(m => m.id === S.sync.me))}(으)로 시작합니다`); return; }
+    if (e.target.id === 'who-skip') { hideOverlays(false); try { sessionStorage.setItem('whoSkipped', '1'); } catch (err) { /* ignore */ } renderWhoChip(); return; }
+    if (e.target.closest('[data-pickme]')) { openWho(true); return; }
     if (e.target.id === 'who-chip') { openWho(true); return; }
     if (e.target.id === 'sync-now') { SYNC.pull(true); toast('갱신 중…'); return; }
     if (e.target.id === 'sync-leave') { if (confirm('가족방 연결을 해제할까요? (찜은 이 기기에 남습니다)')) SYNC.leave(); return; }
