@@ -11,12 +11,12 @@ window.PLANS = [
     tag: '박물관·명소 중심 · 균형형',
     fit: '처음 서울 가족여행 · 세 아이 취향이 고르게 갈릴 때',
     summary: '국립중앙박물관을 축으로 광화문·여의도·잠실 3개 권역을 하루씩. 무료·저비용 위주라 5인 예산 부담이 가장 적음.',
-    stay: 'stay_yongsan',
+    stay: 'stay_fraser',
     budgetHint: '공연(페인터즈)·전망대·아쿠아리움이 비용의 대부분 — 빼면 절반 이하',
     days: {
       d0: [
         { t: '18:00', title: '대전 출발 (경부고속도로)', dur: 150, kind: 'move', act: '저녁은 휴게소(죽암·안성) or 도착 후', note: '화요일 저녁 상행은 원활. 서울 진입 후 한남대교~용산 구간 20분 여유' },
-        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인·짐 풀기', note: '늦은 체크인 사전 고지' },
+        { t: '20:30', p: 'stay_fraser', dur: 40, act: '체크인·짐 풀기', note: '늦은 체크인 사전 고지' },
         { t: '21:25', p: 'nodeul', dur: 30, act: '한강 야경 30분 — "서울 왔다" 신고식', note: '피곤하면 생략. 숙소 편의점 야식으로 대체' }
       ],
       d1: [
@@ -62,12 +62,12 @@ window.PLANS = [
     tag: '한파·미세먼지 대비 · 공연/체험형',
     fit: '한파주의보 예보 · 아이들이 놀이·체험을 역사보다 선호할 때',
     summary: '이동 최소화, 하루에 한 권역의 실내 시설에 몰아넣기. 잠실 하루는 롯데월드 or 키자니아 선택.',
-    stay: 'stay_yongsan',
+    stay: 'stay_lotteworld',
     budgetHint: '5개 안 중 최고가 — 롯데월드 종일권·난타·페인터즈 포함. 놀이 대신 키자니아 분리 시 소폭 절감',
     days: {
       d0: [
         { t: '18:00', title: '대전 출발', dur: 150, kind: 'move', act: '', note: '' },
-        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인', note: '' },
+        { t: '20:30', p: 'stay_lotteworld', dur: 40, act: '체크인', note: '' },
         { t: '21:10', title: '숙소 근처 저녁·휴식', dur: 60, kind: 'rest', act: '용산 아이파크몰 or 배달', note: '다음날 체력 비축' }
       ],
       d1: [
@@ -111,12 +111,12 @@ window.PLANS = [
     tag: '루지 · 북한 조망 · 서해 일몰',
     fit: '몸으로 노는 활동을 좋아하는 아이들 · "평소 못 가는 곳" 우선',
     summary: 'D2 하루를 통째로 강화도에. 남→북 순서(루지→읍내→평화전망대)로 돌고 저녁에 서울 복귀.',
-    stay: 'stay_yongsan',
+    stay: 'stay_fraser',
     budgetHint: '루지 2회권(15.5만)이 최대 항목. 공연 없이도 만족도 높은 구성',
     days: {
       d0: [
         { t: '18:00', title: '대전 출발', dur: 150, kind: 'move', act: '', note: '' },
-        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인', note: '' },
+        { t: '20:30', p: 'stay_fraser', dur: 40, act: '체크인', note: '' },
         { t: '21:25', p: 'nodeul', dur: 30, act: '한강 야경', note: '' }
       ],
       d1: [
@@ -160,12 +160,12 @@ window.PLANS = [
     tag: '차이나타운 · 월미바다열차 · 세계문자박물관',
     fit: '먹거리·사진·박물관 골고루 · 야외 활동 부담 줄이고 싶을 때',
     summary: '송도(실내 박물관) → 차이나타운(점심) → 월미도(열차) 순으로 실내·실외 교대. 강화보다 이동이 짧고 한파에 유연.',
-    stay: 'stay_yongsan',
+    stay: 'stay_fraser',
     budgetHint: '무료 박물관 비중 높음 — 서울스카이·아쿠아리움이 절반 이상',
     days: {
       d0: [
         { t: '18:00', title: '대전 출발', dur: 150, kind: 'move', act: '', note: '' },
-        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인', note: '' },
+        { t: '20:30', p: 'stay_fraser', dur: 40, act: '체크인', note: '' },
         { t: '21:25', p: 'nodeul', dur: 30, act: '한강 야경', note: '' }
       ],
       d1: [
@@ -211,12 +211,12 @@ window.PLANS = [
     tag: '파주 DMZ · 과천과학관 · 청와대',
     fit: '중2·초6이 역사·과학에 관심 · 교과 연계 여행을 원할 때',
     summary: 'D2 오전 임진각 곤돌라(민통선) → 파주 출판도시, D3 과천과학관 반일. 초3을 위해 매일 "놀이 슬롯" 하나씩 배치.',
-    stay: 'stay_yongsan',
+    stay: 'stay_fraser',
     budgetHint: '5개 안 중 최저가 — 국립시설·무료 체험 중심',
     days: {
       d0: [
         { t: '18:00', title: '대전 출발', dur: 150, kind: 'move', act: '', note: '' },
-        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인', note: '' },
+        { t: '20:30', p: 'stay_fraser', dur: 40, act: '체크인', note: '' },
         { t: '21:25', p: 'nodeul', dur: 30, act: '한강 야경', note: '' }
       ],
       d1: [
@@ -259,13 +259,13 @@ window.PLANS = [
     tag: 'LCK · 프로농구 · 기술체험관 · 수원화성',
     fit: '중2·초6이 게임·스포츠·전자기기에 열광할 때 · 귀가길도 여행으로 쓰고 싶을 때',
     summary: '무료 기술체험관(티움·딜라이트)과 경기 관람(롤파크·잠실 농구)을 축으로, 마지막 날은 경부고속도로 길목의 수원화성에서 마무리. 경기 일정은 12월 확정이라 "슬롯"으로 잡아둠.',
-    stay: 'stay_yongsan',
+    stay: 'stay_fraser',
     budgetHint: '경기 티켓은 저렴하고 체험관은 무료 — 서울스카이·아쿠아리움이 비용의 절반',
     days: {
       d0: [
         { t: '18:00', title: '대전 출발', dur: 150, kind: 'move', act: '', note: '' },
-        { t: '20:30', p: 'stay_yongsan', dur: 40, act: '체크인', note: '' },
-        { t: '21:15', p: 'yongridan', dur: 60, act: '숙소 근처 늦은 저녁·디저트', note: '피곤하면 배달로 대체' }
+        { t: '20:30', p: 'stay_fraser', dur: 40, act: '체크인', note: '' },
+        { t: '21:30', p: 'yongridan', dur: 50, act: '숙소 근처 늦은 저녁·디저트', note: '피곤하면 배달로 대체' }
       ],
       d1: [
         { t: '10:00', p: 'nmk', dur: 200, act: '사유의 방 → 실감영상관 → 어린이박물관(예약 회차)', note: '★ 필수. 수요일 야간개장' },

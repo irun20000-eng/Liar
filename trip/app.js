@@ -47,10 +47,11 @@
     theme: 'auto', members: {}, votes: {}, checks: {},
     mine: Object.fromEntries(T.meta.days.map(d => [d.id, []])),
     mineStart: Object.fromEntries(T.meta.days.map(d => [d.id, d.start])),
-    planId: 'A', planDay: 'd1', mineDay: 'd1', poolType: '', poolFilters: {}, poolSort: 'rec', poolRegion: ''
+    planId: 'A', planDay: 'd1', mineDay: 'd1', poolType: '', poolFilters: {}, poolSort: 'rec', poolRegion: '',
+    budget: { stayId: 'stay_fraser', nightly: '', nights: 4, fuelEff: 12, fuelPrice: 1700, extraKm: 0, tolls: 20000, parkingPerDay: 15000, parkingDays: 3, mealB: 6000, mealL: 12000, mealD: 15000, snacks: 20000, reservePct: 10, scenario: 'base' }
   });
   let S = defaults();
-  try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(defaults(), JSON.parse(raw)); } catch (e) { /* 저장 불가 환경 */ }
+  try { const raw = localStorage.getItem(KEY); if (raw) { const d = defaults(), o = JSON.parse(raw); S = Object.assign(d, o); S.budget = Object.assign(d.budget, o.budget || {}); if (!byId[S.budget.stayId]) S.budget.stayId = d.budget.stayId; } } catch (e) { /* 저장 불가 환경 */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignore */ } };
   const memberName = m => S.members[m.id] || m.name;
   const voteCount = pid => (S.votes[pid] || []).length;
@@ -119,6 +120,103 @@
     return { rows, cost, foodCost, start: rows[0]?.start, end: rows.length ? rows[rows.length - 1].end : null, nPlaces: rows.filter(r => r.place && r.place.type !== 'stay').length };
   }
 
+  /* ---------- 예산 계산 ---------- */
+  const MEALS = { d0: ['d'], d1: ['b', 'l', 'd'], d2: ['b', 'l', 'd'], d3: ['b', 'l', 'd'], d4: ['b', 'l'] };
+  const mealOf = m => m < 630 ? 'b' : m < 1020 ? 'l' : 'd';
+  const SCEN = {
+    save: { label: '절약', entry: .85, food: .85, meal: .8, snacks: .5, stay: 'min' },
+    base: { label: '기본', entry: 1, food: 1, meal: 1, snacks: 1, stay: 'est' },
+    comfy: { label: '여유', entry: 1.1, food: 1.3, meal: 1.2, snacks: 1.5, stay: 'max' }
+  };
+  const HOME_KM = 160; // 대전 ↔ 서울 편도(고속도로 기준)
+  function computeBudget(slotsByDay, startByDay, stayId, B) {
+    const stay = byId[stayId];
+    const days = T.meta.days.map(d => {
+      const c = computeDay(slotsByDay[d.id] || [], d, startByDay[d.id] || d.start);
+      const ent = { a: 0, t: 0, c: 0 }, mealsHit = new Set(); let food = 0, km = 0, prev = null, n = 0;
+      c.rows.forEach(r => {
+        const pl = r.place; if (!pl) return;
+        if (pl.type === 'food') { food += familyCost(pl); mealsHit.add(mealOf(r.start)); }
+        else if (pl.type !== 'stay') { ent.a += pl.cost.a * 2; ent.t += pl.cost.t; ent.c += pl.cost.c * 2; n++; }
+        if (prev && prev !== pl) km += travelEst(prev, pl).km * 1.3; prev = pl;
+      });
+      const missing = (MEALS[d.id] || []).filter(m => !mealsHit.has(m));
+      const missingCost = missing.reduce((a, m) => a + ({ b: B.mealB, l: B.mealL, d: B.mealD }[m] || 0) * 5, 0);
+      return { day: d, n, entry: ent.a + ent.t + ent.c, ent, food, mealsAssigned: mealsHit.size, missing, missingCost, km };
+    });
+    const sum = k => days.reduce((a, x) => a + x[k], 0);
+    const kmTotal = HOME_KM * 2 + sum('km') + Number(B.extraKm || 0);
+    const fuel = kmTotal / Math.max(1, Number(B.fuelEff)) * Number(B.fuelPrice);
+    const nights = Number(B.nights) || 4;
+    const stayRate = { min: stay?.stay?.nightly?.[0], est: stay?.stay?.nightlyEst, max: stay?.stay?.nightly?.[1] };
+    const scen = {};
+    Object.entries(SCEN).forEach(([k, m]) => {
+      const rate = B.nightly ? Number(B.nightly) : (stayRate[m.stay] || 0);
+      const rows = {
+        stay: rate * nights, entry: sum('entry') * m.entry, food: sum('food') * m.food, missing: sum('missingCost') * m.meal,
+        snacks: Number(B.snacks) * 5 * m.snacks, fuel, tolls: Number(B.tolls), parking: Number(B.parkingPerDay) * Number(B.parkingDays)
+      };
+      const subtotal = Object.values(rows).reduce((a, v) => a + v, 0);
+      const reserve = subtotal * Number(B.reservePct) / 100;
+      scen[k] = Object.assign(rows, { rate, subtotal, reserve, total: subtotal + reserve, perPerson: (subtotal + reserve) / 5 });
+    });
+    const entA = days.reduce((a, x) => a + x.ent.a, 0) / 2, entT = days.reduce((a, x) => a + x.ent.t, 0), entC = days.reduce((a, x) => a + x.ent.c, 0) / 2;
+    return { days, kmTotal, nights, stay, scen, entryBreak: { a: entA, t: entT, c: entC }, mealsAssigned: sum('mealsAssigned'), mealsMissing: days.reduce((a, x) => a + x.missing.length, 0), foodTotal: sum('food'), entryTotal: sum('entry') };
+  }
+  const wonK = n => n >= 10000 ? `${(Math.round(n / 1000) / 10).toLocaleString('ko-KR')}만` : Math.round(n).toLocaleString('ko-KR');
+
+  function renderBudget(el, slotsByDay, startByDay, stayId, editable) {
+    const B = S.budget, R = computeBudget(slotsByDay, startByDay, stayId, B), cur = SCEN[B.scenario] ? B.scenario : 'base', C = R.scen[cur];
+    const scenBtns = Object.entries(SCEN).map(([k, m]) => `<button data-scen="${k}" class="${k === cur ? 'on' : ''}">${m.label}</button>`).join('');
+    const tiles = `<div class="budget-tiles">
+      <div class="total"><b>${wonK(C.total)}원</b><span>총예산 (${SCEN[cur].label}, 예비비 포함)</span></div>
+      <div><b>${wonK(C.perPerson)}원</b><span>1인당</span></div>
+      <div><b>${wonK(C.stay)}원</b><span>숙박 ${R.nights}박</span></div>
+      <div><b>${wonK(C.entry)}원</b><span>입장·체험·공연</span></div>
+      <div><b>${wonK(C.food + C.missing + C.snacks)}원</b><span>식비·간식</span></div>
+      <div><b>${wonK(C.fuel + C.tolls + C.parking)}원</b><span>연료·톨·주차</span></div></div>`;
+    const cell = (k, v) => `<td class="${k === cur ? 'on' : ''}">${won(Math.round(v))}</td>`;
+    const row = (label, key, note) => `<tr><td>${label}${note ? `<span class="sub-note">${note}</span>` : ''}</td>${Object.keys(SCEN).map(k => cell(k, R.scen[k][key])).join('')}</tr>`;
+    const stayName = R.stay ? esc(R.stay.name.replace(/\s*\(.*$/, '').slice(0, 14)) : '숙소 미선택';
+    const table = `<div class="table-wrap"><table class="budget-table"><thead><tr><th>항목</th>${Object.entries(SCEN).map(([k, m]) => `<th class="${k === cur ? 'on' : ''}">${m.label}</th>`).join('')}</tr></thead><tbody>
+      ${row(`숙박 ${R.nights}박 · ${stayName}`, 'stay', B.nightly ? `1박 ${won(Number(B.nightly))} (직접 입력)` : `1박 ${won(R.scen.save.rate)} ~ ${won(R.scen.comfy.rate)} 추정`)}
+      ${row('입장 · 체험 · 공연', 'entry', `성인 1인 ${won(R.entryBreak.a)} · 청소년 ${won(R.entryBreak.t)} · 어린이 1인 ${won(R.entryBreak.c)} · 절약=할인권, 여유=패스트패스 등`)}
+      ${row(`식비 — 일정에 넣은 맛집 ${R.mealsAssigned}끼`, 'food', '카드 요금 × 5인')}
+      ${row(`식비 — 아직 안 정한 끼니 ${R.mealsMissing}끼`, 'missing', `아침 ${won(B.mealB)} · 점심 ${won(B.mealL)} · 저녁 ${won(B.mealD)} × 5인 (설정에서 변경)`)}
+      ${row('간식 · 카페 · 기념품', 'snacks', `1일 ${won(B.snacks)} × 5일`)}
+      ${row(`연료 — 약 ${Math.round(R.kmTotal)}km`, 'fuel', `대전↔서울 ${HOME_KM * 2}km + 일정 내 이동 ${Math.round(R.kmTotal - HOME_KM * 2 - Number(B.extraKm || 0))}km${B.extraKm ? ` + 추가 ${B.extraKm}km` : ''} · 연비 ${B.fuelEff}km/L · ${won(B.fuelPrice)}/L`)}
+      ${row('톨게이트 (왕복)', 'tolls', '')}
+      ${row(`주차 ${B.parkingDays}일`, 'parking', `1일 ${won(B.parkingPerDay)} · 숙소 무료주차면 도심 공영주차 기준`)}
+      <tr class="sub"><td>소계</td>${Object.keys(SCEN).map(k => cell(k, R.scen[k].subtotal)).join('')}</tr>
+      ${row(`예비비 ${B.reservePct}%`, 'reserve', '')}
+      <tr class="total"><td>총예산</td>${Object.keys(SCEN).map(k => cell(k, R.scen[k].total)).join('')}</tr>
+      <tr><td>1인당</td>${Object.keys(SCEN).map(k => cell(k, R.scen[k].perPerson)).join('')}</tr>
+    </tbody></table></div>`;
+    const maxDay = Math.max(1, ...R.days.map(d => d.entry + d.food + d.missingCost));
+    const MEAL_KO = { b: '아침', l: '점심', d: '저녁' };
+    const dayTable = `<details class="bset"><summary>일자별 내역 (기본 시나리오)</summary><div class="table-wrap"><table class="budget-table"><thead><tr><th>일자</th><th>장소</th><th>입장·체험</th><th>맛집(배정)</th><th>미정 끼니</th><th>이동</th><th>합계</th></tr></thead><tbody>
+      ${R.days.map(d => { const tot = d.entry + d.food + d.missingCost; return `<tr><td>${d.day.label}</td><td>${d.n}곳</td><td>${won(d.entry)}</td><td>${won(d.food)}<span class="sub-note">${d.mealsAssigned}끼</span></td><td>${won(d.missingCost)}<span class="sub-note">${d.missing.map(m => MEAL_KO[m]).join('·') || '없음'}</span></td><td>${Math.round(d.km)}km</td><td><b>${won(tot)}</b><i class="bar" style="width:${Math.round(tot / maxDay * 60)}px"></i></td></tr>`; }).join('')}
+    </tbody></table></div></details>`;
+    const stays = T.places.filter(p => p.type === 'stay');
+    const settings = editable ? `<details class="bset"><summary>설정 — 숙소 · 단가 · 차량</summary><div class="bset-grid">
+      <label class="wide">숙소 (장소 풀 → 숙소 탭에서 비교) <select data-b="stayId">${stays.map(p => `<option value="${p.id}" ${p.id === B.stayId ? 'selected' : ''}>${esc(p.name)} — 1박 약 ${wonK(p.stay?.nightlyEst || 0)}</option>`).join('')}</select></label>
+      <label>1박 요금 직접 입력 (비우면 추정치) <input type="number" step="10000" min="0" data-b="nightly" value="${esc(B.nightly)}" placeholder="${R.stay?.stay?.nightlyEst || ''}"></label>
+      <label>박수 <input type="number" min="0" max="10" data-b="nights" value="${B.nights}"></label>
+      <label>주차 1일 (원) <input type="number" step="1000" min="0" data-b="parkingPerDay" value="${B.parkingPerDay}"></label>
+      <label>주차 일수 <input type="number" min="0" max="5" data-b="parkingDays" value="${B.parkingDays}"></label>
+      <label>연비 (km/L) <input type="number" step="0.5" min="1" data-b="fuelEff" value="${B.fuelEff}"></label>
+      <label>유가 (원/L) <input type="number" step="10" min="0" data-b="fuelPrice" value="${B.fuelPrice}"></label>
+      <label>추가 주행 (km) <input type="number" step="10" min="0" data-b="extraKm" value="${B.extraKm}"></label>
+      <label>톨게이트 왕복 (원) <input type="number" step="1000" min="0" data-b="tolls" value="${B.tolls}"></label>
+      <label>아침 1인 (원) <input type="number" step="1000" min="0" data-b="mealB" value="${B.mealB}"></label>
+      <label>점심 1인 (원) <input type="number" step="1000" min="0" data-b="mealL" value="${B.mealL}"></label>
+      <label>저녁 1인 (원) <input type="number" step="1000" min="0" data-b="mealD" value="${B.mealD}"></label>
+      <label>간식·기타 1일 (원) <input type="number" step="5000" min="0" data-b="snacks" value="${B.snacks}"></label>
+      <label>예비비 (%) <input type="number" min="0" max="50" data-b="reservePct" value="${B.reservePct}"></label>
+    </div><p class="budget-note">요금은 2026년 9월 조사 기준 추정치입니다. 숙소 1박은 예약 사이트 실제 가격을 입력하면 정확해집니다. 레지던스(주방)를 고르면 아침 단가를 3,000원 수준으로 낮춰도 됩니다.</p></details>` : '';
+    el.innerHTML = `<div class="budget-head"><h2>💰 예산 계산기</h2><div class="scen">${scenBtns}</div></div>${tiles}${table}${dayTable}${settings}`;
+  }
+
   const typeChip = p => { const t = typeById[p.type]; return `<span class="chip type" style="background:${t.color}">${t.emoji} ${t.label}</span>`; };
   const statusChip = p => p.status === 'ok' ? `<span class="chip ok">운영 확인</span>` : `<span class="chip verify" title="${esc(p.verifyNote || '')}">확인 필요</span>`;
   const stars = n => `<span class="stars">${'★'.repeat(n)}<span>${'★'.repeat(3 - n)}</span></span>`;
@@ -182,7 +280,7 @@
 
     // 예약 캘린더
     const items = [
-      { id: 'stay', when: '지금 ~ 11월', title: '숙소 예약 (5인 1실 · 주차 확인)', sub: '용산권 4박 고정 권장. 연말·연초 성수기 전에' },
+      { id: 'stay', when: '지금 ~ 11월', title: '숙소 예약 (5인 1실 · 주차 확인)', sub: '1순위 프레이저 플레이스 센트럴 서울 — 장소 풀 → 숙소 탭에서 10곳 비교, 4박 고정 권장' },
       { id: 'lineup', when: '10~11월', title: '겨울방학 공연 라인업 확인 → 공연 1~2개 예매', sub: '세종문화회관 · 샤롯데씨어터 · 국립극장 · 예술의전당' },
       { id: 'nanta', when: '11~12월', title: '난타 / 페인터즈 2027.1 일정 확인 후 예매', sub: '현재 확정 기간이 2026년 말까지라 연장 공지 확인' },
       { id: 'season', when: '12월 초', title: '서울광장 스케이트장 · 뚝섬 눈썰매장 · 빛초롱축제 26-27 시즌 일정 확인', sub: '' },
@@ -251,8 +349,17 @@
     const list = poolList($('#pool-q').value, S.poolType, S.poolFilters, S.poolRegion, S.poolSort);
     $('#pool-count').textContent = `${list.length}개 표시 · 5인 비용은 성인2·청소년1·어린이2 기준 추정`;
     $('#pool-cards').innerHTML = list.map(cardHTML).join('') || '<p class="empty">조건에 맞는 장소가 없습니다.</p>';
+    const st = $('#stay-table');
+    if (S.poolType === 'stay') {
+      const stays = T.places.filter(p => p.type === 'stay');
+      const nights = Number(S.budget.nights) || 4;
+      st.innerHTML = `<div class="stay-wrap"><table class="stay-table"><thead><tr><th>숙소</th><th>권역</th><th>객실 · 인원</th><th>주방/세탁</th><th>수영장 등</th><th>주차</th><th>1박 추정</th><th>${nights}박</th><th>추천안</th><th>계산기</th></tr></thead><tbody>
+        ${stays.map(p => { const x = p.stay || {}; const sel = p.id === S.budget.stayId; return `<tr class="${sel ? 'sel' : ''}"><td class="name"><button class="link-btn" data-open="${p.id}">${esc(p.name)}</button>${p.tags?.includes('1순위') ? ' <span class="chip">1순위</span>' : ''}</td><td>${esc(regionById[p.region]?.label || '')}</td><td>${esc(x.room || '')}<span class="sub-note" style="display:block;color:var(--muted);font-size:.74rem">${esc(x.maxGuests || '')}</span></td><td>${x.kitchen === true ? '주방 ○' : x.kitchen ? '주방 ' + esc(x.kitchen) : '주방 ×'} / ${x.laundry ? '세탁 ○' : '세탁 ×'}</td><td>${esc(x.pool || '—')}</td><td>${esc(x.parking || '')}</td><td class="num">${x.nightly ? `${wonK(x.nightly[0])}~${wonK(x.nightly[1])}` : '—'}</td><td class="num"><b>${wonK((x.nightlyEst || 0) * nights)}</b></td><td>${(x.bestFor || []).join(' · ')}</td><td><button data-pickstay="${p.id}" class="${sel ? 'on' : ''}">${sel ? '선택됨' : '선택'}</button></td></tr>`; }).join('')}
+      </tbody></table></div><p class="muted small">요금은 2026.9 조사 기준 1박 추정 범위이며 성수기·요일에 따라 다릅니다. "선택"을 누르면 내 일정의 예산 계산기에 반영됩니다. 5인 1실 가능 여부는 모두 예약 전 확인이 필요합니다.</p>`;
+    } else st.innerHTML = '';
   }
   $('#type-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.poolType = b.dataset.type; save(); renderPool(); });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-pickstay]'); if (!b) return; S.budget.stayId = b.dataset.pickstay; S.budget.nightly = ''; save(); renderPool(); renderMine(); renderPlans(); toast(`예산 계산기 숙소: ${byId[b.dataset.pickstay].name}`); if ($('#modal').hidden === false) closeModals(); });
   $('#pool-filters').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.id === 'pool-clear') { S.poolFilters = {}; S.poolRegion = ''; S.poolType = ''; $('#pool-q').value = ''; save(); renderPool(); return; } S.poolFilters[b.dataset.f] = !S.poolFilters[b.dataset.f]; save(); renderPool(); });
   $('#pool-q').addEventListener('input', renderPool);
   $('#pool-region').addEventListener('change', e => { S.poolRegion = e.target.value; save(); renderPool(); });
@@ -278,6 +385,7 @@
         <dt>추천도</dt><dd>${ages}</dd>
         ${inPlans.length ? `<dt>추천안</dt><dd>${inPlans.map(id => `<span class="chip">${id}안</span>`).join(' ')}</dd>` : ''}
       </dl>
+      ${p.stay ? `<div class="stay-box"><b>🏨 객실</b> ${esc(p.stay.room)} · <b>인원</b> ${esc(p.stay.maxGuests)}<br><b>시설</b> ${p.stay.kitchen === true ? '주방 ○' : p.stay.kitchen ? '주방 ' + esc(p.stay.kitchen) : '주방 ×'} · ${p.stay.laundry ? '세탁 ○' : '세탁 ×'} · ${esc(p.stay.pool || '')}<br><b>1박 추정</b> ${won(p.stay.nightly[0])} ~ ${won(p.stay.nightly[1])} (계산기 기본 ${won(p.stay.nightlyEst)}) · <b>${Number(S.budget.nights) || 4}박</b> 약 ${won(p.stay.nightlyEst * (Number(S.budget.nights) || 4))}<div class="pc"><div><b>👍 장점</b><ul>${p.stay.pros.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div><div><b>👎 단점</b><ul>${p.stay.cons.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div></div><div style="margin-top:8px"><button class="btn small ${S.budget.stayId === p.id ? 'primary' : ''}" data-pickstay="${p.id}">${S.budget.stayId === p.id ? '✓ 예산 계산기 숙소로 선택됨' : '💰 예산 계산기 숙소로 선택'}</button></div></div>` : ''}
       ${p.tips ? `<div class="tips"><b>비고</b> · ${esc(p.tips)}</div>` : ''}
       <div class="links">
         ${p.links?.official ? `<a class="btn small" href="${p.links.official}" target="_blank" rel="noopener">🔗 공식</a>` : ''}
@@ -318,7 +426,10 @@
     const stay = byId[plan.stay];
     const days = T.meta.days.map(d => computeDay(plan.days[d.id] || [], d, d.start));
     const total = days.reduce((a, c) => a + c.cost, 0), food = days.reduce((a, c) => a + c.foodCost, 0);
-    $('#plan-summary').innerHTML = `<h2>${esc(plan.name)}</h2><p class="fit">👨‍👩‍👧‍👦 이런 가족에게: ${esc(plan.fit)}</p><p>${esc(plan.summary)}</p><div class="kv"><span>🏨 숙소: <button class="link-btn" data-open="${stay.id}">${esc(stay.name)}</button></span><span>🎟️ 입장·체험·공연 5인 <b>${won(total - food)}</b></span><span>🍜 식비 추정 <b>${won(food)}</b></span><span>💡 ${esc(plan.budgetHint)}</span></div>`;
+    const starts = Object.fromEntries(T.meta.days.map(d => [d.id, d.start]));
+    const PB = computeBudget(plan.days, starts, plan.stay, S.budget), cur = SCEN[S.budget.scenario] ? S.budget.scenario : 'base';
+    $('#plan-summary').innerHTML = `<h2>${esc(plan.name)}</h2><p class="fit">👨‍👩‍👧‍👦 이런 가족에게: ${esc(plan.fit)}</p><p>${esc(plan.summary)}</p><div class="kv"><span>🏨 숙소: <button class="link-btn" data-open="${stay.id}">${esc(stay.name)}</button></span><span>🎟️ 입장·체험·공연 5인 <b>${won(total - food)}</b></span><span>🍜 식비 추정 <b>${won(food)}</b></span><span>💡 ${esc(plan.budgetHint)}</span></div>
+      <div class="kv"><span>💰 <b>예상 총예산 ${wonK(PB.scen[cur].total)}원</b> (${SCEN[cur].label} · 숙박 ${PB.nights}박 · 식비 · 연료 · 주차 · 예비비 포함 · 1인 ${wonK(PB.scen[cur].perPerson)}원)</span><span>절약 ${wonK(PB.scen.save.total)} / 기본 ${wonK(PB.scen.base.total)} / 여유 ${wonK(PB.scen.comfy.total)}</span></div>`;
     $('#plan-day-tabs').innerHTML = T.meta.days.map(d => `<button data-day="${d.id}" class="${d.id === S.planDay ? 'on' : ''}">${d.label}<small>${esc(d.hint)}</small></button>`).join('');
     $('#plan-days').innerHTML = T.meta.days.map(d => `<section class="day-panel" ${d.id === S.planDay ? '' : 'hidden'}><div class="day-head"><h2>${d.label}</h2><span class="hint">${esc(d.hint)}</span></div>${renderTimeline(plan.days[d.id] || [], d, d.start, false)}</section>`).join('');
     $('#btn-plan-map').href = `#map/plan-${plan.id}/${S.planDay}`;
@@ -348,12 +459,18 @@
     $('#mine-day-tabs').innerHTML = T.meta.days.map(x => { const n = S.mine[x.id].filter(s => s.p).length; return `<button data-day="${x.id}" class="${x.id === S.mineDay ? 'on' : ''}">${x.label}<small>${n ? n + '곳' : '비어 있음'}</small></button>`; }).join('');
     $('#mine-days').innerHTML = T.meta.days.map(x => `<section class="day-panel" ${x.id === S.mineDay ? '' : 'hidden'}><div class="day-head"><h2>${x.label}</h2><label class="day-start">시작 시각 <input type="time" value="${S.mineStart[x.id]}" data-start="${x.id}"></label></div>${renderTimeline(S.mine[x.id], x, S.mineStart[x.id], true)}</section>`).join('');
     const tot = T.meta.days.map(x => computeDay(S.mine[x.id], x, S.mineStart[x.id]));
-    const cost = tot.reduce((a, c) => a + c.cost, 0), food = tot.reduce((a, c) => a + c.foodCost, 0), n = tot.reduce((a, c) => a + c.nPlaces, 0);
     const warns = tot.reduce((a, c) => a + c.rows.reduce((b, r) => b + r.warns.length + (r.fixed && r.slack < -10 ? 1 : 0), 0), 0);
-    $('#budget').innerHTML = `<div><b>${n}</b><span>장소·활동</span></div><div><b>${won(cost - food)}</b><span>입장·체험 (5인)</span></div><div><b>${won(food)}</b><span>식비 추정 (5인)</span></div><div><b style="color:${warns ? 'var(--warn)' : 'var(--good)'}">${warns}</b><span>충돌 경고</span></div>`;
+    renderBudget($('#budget'), S.mine, S.mineStart, S.budget.stayId, true);
+    $('#budget').insertAdjacentHTML('beforeend', `<p class="budget-note">⚠️ 충돌 경고 <b style="color:${warns ? 'var(--warn)' : 'var(--good)'}">${warns}건</b> — 각 일자의 슬롯에서 확인</p>`);
     void d;
   }
   $('#mine-day-tabs').addEventListener('click', e => { const b = e.target.closest('[data-day]'); if (!b) return; S.mineDay = b.dataset.day; save(); renderMine(); });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-scen]'); if (!b) return; S.budget.scenario = b.dataset.scen; save(); renderMine(); renderPlans(); });
+  $('#budget').addEventListener('change', e => {
+    const k = e.target.dataset.b; if (!k) return;
+    S.budget[k] = e.target.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value;
+    save(); renderMine(); renderPlans(); renderPool();
+  });
   $('#mine-days').addEventListener('change', e => {
     const t = e.target;
     if (t.dataset.start) { S.mineStart[t.dataset.start] = t.value || dayById[t.dataset.start].start; save(); renderMine(); return; }
@@ -384,7 +501,7 @@
   });
   $('#btn-reset').addEventListener('click', () => { if (!S.mine[S.mineDay].length) return; if (confirm(`${dayById[S.mineDay].label} 일정을 모두 지울까요?`)) { S.mine[S.mineDay] = []; save(); renderMine(); renderHome(); } });
   $('#btn-export').addEventListener('click', () => {
-    const data = { app: 'seoul-winter-trip', version: 1, exportedAt: new Date().toISOString(), members: S.members, votes: S.votes, checks: S.checks, mine: S.mine, mineStart: S.mineStart };
+    const data = { app: 'seoul-winter-trip', version: 1, exportedAt: new Date().toISOString(), members: S.members, votes: S.votes, checks: S.checks, mine: S.mine, mineStart: S.mineStart, budget: S.budget };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `seoul-trip-2027-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href);
     toast('JSON 파일로 내보냈습니다');
@@ -394,7 +511,7 @@
     f.text().then(txt => {
       const d = JSON.parse(txt); if (d.app !== 'seoul-winter-trip') throw new Error('형식이 다릅니다');
       if (!confirm('가져온 내용으로 내 일정·찜·체크를 덮어쓸까요?')) return;
-      ['members', 'votes', 'checks', 'mine', 'mineStart'].forEach(k => { if (d[k]) S[k] = d[k]; });
+      ['members', 'votes', 'checks', 'mine', 'mineStart'].forEach(k => { if (d[k]) S[k] = d[k]; }); if (d.budget) S.budget = Object.assign(defaults().budget, d.budget);
       T.meta.days.forEach(x => { S.mine[x.id] = S.mine[x.id] || []; S.mineStart[x.id] = S.mineStart[x.id] || x.start; });
       save(); renderAll(); toast('가져오기 완료');
     }).catch(err => alert('가져오기 실패: ' + err.message)).finally(() => { e.target.value = ''; });
@@ -453,7 +570,7 @@
   function sharePayload() {
     // 슬롯을 배열로 축약: [p, title, kind, dur, fixed, act, note]
     const days = T.meta.days.map(d => S.mine[d.id].map(s => [s.p || '', s.title || '', s.kind || '', s.dur, s.fixed || '', s.act || '', s.note || '']));
-    return b64e(JSON.stringify({ v: 1, st: T.meta.days.map(d => S.mineStart[d.id]), m: S.members, d: days }));
+    return b64e(JSON.stringify({ v: 1, st: T.meta.days.map(d => S.mineStart[d.id]), m: S.members, d: days, b: S.budget }));
   }
   function applyShare(code) {
     const o = JSON.parse(b64d(code)); if (o.v !== 1 || !Array.isArray(o.d)) throw new Error('형식 오류');
@@ -462,6 +579,7 @@
       S.mineStart[d.id] = (o.st && o.st[i]) || d.start;
     });
     if (o.m) S.members = o.m;
+    if (o.b) S.budget = Object.assign(defaults().budget, o.b);
     save(); renderAll();
   }
   $('#btn-share').addEventListener('click', async () => {
