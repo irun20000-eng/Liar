@@ -194,6 +194,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .sync-more code { font-size: .74rem; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
 .sync-more .toolbar { margin: 8px 0 4px; } .sync-more input { flex: 1 1 200px; }
 .small-h { font-size: .86rem; color: var(--muted); }
+.fb-guide { flex-basis: 100%; }
+.fb-guide ol { padding-left: 1.2em; margin: 6px 0; font-size: .86rem; }
+.fb-guide li { margin: 6px 0; }
+.fb-guide pre.rules { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: .74rem; margin: 6px 0 0; overflow-x: auto; }
+.fb-guide code { font-size: .78rem; background: var(--surface); padding: 1px 4px; border-radius: 4px; }
+.fb-guide .toolbar input { flex: 1 1 260px; }
 .activity { list-style: none; padding: 0; margin: 4px 0 0; font-size: .84rem; }
 .activity li { padding: 4px 0; border-top: 1px dashed var(--line); }
 .activity li:first-child { border-top: 0; }

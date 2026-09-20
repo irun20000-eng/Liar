@@ -60,7 +60,7 @@
   const memberName = m => (S.mem[m.id] && S.mem[m.id].name) || m.name;
   const votedBy = pid => Object.entries(S.vt[pid] || {}).filter(([, v]) => v.on).map(([mid]) => mid);
   const voteCount = pid => votedBy(pid).length;
-  function setVote(pid, mid, on) { (S.vt[pid] = S.vt[pid] || {})[mid] = { on, ts: Date.now() }; save(); if (typeof SYNC !== 'undefined') SYNC.schedulePush(); }
+  function setVote(pid, mid, on) { (S.vt[pid] = S.vt[pid] || {})[mid] = { on, ts: Date.now() }; save(); if (typeof SYNC !== 'undefined') SYNC.markDirty(`vt/${pid}/${mid}`); }
 
   let toastTimer;
   function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 2200); }
@@ -310,7 +310,7 @@
   }
   $('#view-home').addEventListener('change', e => {
     if (e.target.dataset.check) { S.checks[e.target.dataset.check] = e.target.checked; save(); renderHome(); }
-    if (e.target.dataset.member) { const mid = e.target.dataset.member; S.mem[mid] = { name: e.target.value.trim() || T.members.find(m => m.id === mid).name, ts: Date.now() }; save(); SYNC.schedulePush(); renderHome(); }
+    if (e.target.dataset.member) { const mid = e.target.dataset.member; S.mem[mid] = { name: e.target.value.trim() || T.members.find(m => m.id === mid).name, ts: Date.now() }; save(); SYNC.markDirty(`mem/${mid}`); renderHome(); }
   });
 
   /* ---------- 장소 풀 ---------- */
@@ -518,7 +518,7 @@
     f.text().then(txt => {
       const d = JSON.parse(txt); if (d.app !== 'seoul-winter-trip') throw new Error('형식이 다릅니다');
       if (!confirm('가져온 내용으로 내 일정·찜·체크를 덮어쓸까요?')) return;
-      ['checks', 'mine', 'mineStart', 'vt', 'mem'].forEach(k => { if (d[k]) S[k] = d[k]; }); if (d.votes && !d.vt) { S.vt = {}; Object.entries(d.votes).forEach(([pid, arr]) => (arr || []).forEach(mid => { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: true, ts: 1 }; })); } if (d.members && !d.mem) { S.mem = {}; Object.entries(d.members).forEach(([mid, name]) => { S.mem[mid] = { name, ts: 1 }; }); } if (d.budget) S.budget = Object.assign(defaults().budget, d.budget); SYNC.schedulePush();
+      ['checks', 'mine', 'mineStart', 'vt', 'mem'].forEach(k => { if (d[k]) S[k] = d[k]; }); if (d.votes && !d.vt) { S.vt = {}; Object.entries(d.votes).forEach(([pid, arr]) => (arr || []).forEach(mid => { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: true, ts: 1 }; })); } if (d.members && !d.mem) { S.mem = {}; Object.entries(d.members).forEach(([mid, name]) => { S.mem[mid] = { name, ts: 1 }; }); } if (d.budget) S.budget = Object.assign(defaults().budget, d.budget); SYNC.markAllDirty(); SYNC.schedulePush();
       T.meta.days.forEach(x => { S.mine[x.id] = S.mine[x.id] || []; S.mineStart[x.id] = S.mineStart[x.id] || x.start; });
       save(); renderAll(); toast('가져오기 완료');
     }).catch(err => alert('가져오기 실패: ' + err.message)).finally(() => { e.target.value = ''; });
@@ -674,71 +674,145 @@
     top.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   })();
 
-  /* ---------- 가족 실시간 공유 (JSON 저장소 폴링 + LWW 병합) ---------- */
+  /* ---------- 가족 실시간 공유 (Firebase Realtime Database 스트리밍 + 셀 단위 LWW 병합) ---------- */
+  const FB_RULES = '{\n  "rules": {\n    "rooms": {\n      "$room": { ".read": true, ".write": true }\n    }\n  }\n}';
   const SYNC = (() => {
-    let timer = null, pushTimer = null, busy = false;
+    let es = null, pollTimer = null, pushTimer = null, retryTimer = null, busy = false, esFails = 0;
+    const dirty = new Set(); // 'vt/장소/가족원' 또는 'mem/가족원' — 아직 서버에 안 올린 로컬 변경
     const now = () => Date.now();
+    const isFirebase = url => /firebaseio\.com|firebasedatabase\.app/i.test(url);
     const state = () => ({ v: 1, app: 'seoul-winter-trip', vt: S.vt, mem: S.mem, updatedAt: now() });
-    function merge(remote) {
-      let changed = false, localNewer = false;
-      const rv = (remote && remote.vt) || {}, rm = (remote && remote.mem) || {};
-      for (const pid in rv) for (const mid in rv[pid]) {
-        const r = rv[pid][mid], l = S.vt[pid] && S.vt[pid][mid];
-        if (!l || (r.ts || 0) > (l.ts || 0)) { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: !!r.on, ts: r.ts || 0 }; changed = true; }
-        else if ((l.ts || 0) > (r.ts || 0)) localNewer = true;
-      }
-      for (const pid in S.vt) for (const mid in S.vt[pid]) if (!(rv[pid] && rv[pid][mid])) localNewer = true;
-      for (const mid in rm) { const r = rm[mid], l = S.mem[mid]; if (!l || (r.ts || 0) > (l.ts || 0)) { S.mem[mid] = { name: String(r.name || ''), ts: r.ts || 0 }; changed = true; } else if ((l.ts || 0) > (r.ts || 0)) localNewer = true; }
-      for (const mid in S.mem) if (!rm[mid]) localNewer = true;
-      return { changed, localNewer };
+    // Firebase 멀티패스 패치는 최상위 키가 "vt/nmk/k1"처럼 납작하게 옴 → 중첩 객체로 펼침
+    function expand(obj) {
+      if (!obj || typeof obj !== 'object') return obj;
+      const out = {};
+      Object.entries(obj).forEach(([k, v]) => {
+        const segs = k.split('/').filter(Boolean); let cur = out;
+        segs.forEach((s, i) => { if (i === segs.length - 1) cur[s] = (cur[s] && typeof cur[s] === 'object' && v && typeof v === 'object') ? Object.assign(cur[s], v) : v; else cur = cur[s] = (cur[s] && typeof cur[s] === 'object') ? cur[s] : {}; });
+      });
+      return out;
     }
-    async function get() { const r = await fetch(S.sync.url, { headers: { Accept: 'application/json' }, cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
-    async function put(obj) { const r = await fetch(S.sync.url, { method: 'PUT', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(obj) }); if (!r.ok) throw new Error('HTTP ' + r.status); }
+    function partialFromPath(path, data) {
+      const segs = (path || '/').split('/').filter(Boolean);
+      if (!segs.length) return expand(data) || {};
+      const root = {}; let cur = root;
+      segs.forEach((s, i) => { cur[s] = i === segs.length - 1 ? data : {}; cur = cur[s]; });
+      return root;
+    }
+    function merge(remote) {
+      let changed = false; const newer = [];
+      const rv = (remote && remote.vt) || {}, rm = (remote && remote.mem) || {};
+      for (const pid in rv) for (const mid in rv[pid] || {}) {
+        const r = rv[pid][mid]; if (!r || typeof r !== 'object') continue;
+        const l = S.vt[pid] && S.vt[pid][mid];
+        if (!l || (r.ts || 0) > (l.ts || 0)) { (S.vt[pid] = S.vt[pid] || {})[mid] = { on: !!r.on, ts: r.ts || 0 }; changed = true; }
+        else if ((l.ts || 0) > (r.ts || 0)) newer.push(`vt/${pid}/${mid}`);
+      }
+      for (const mid in rm) { const r = rm[mid]; if (!r || typeof r !== 'object') continue; const l = S.mem[mid]; if (!l || (r.ts || 0) > (l.ts || 0)) { S.mem[mid] = { name: String(r.name || ''), ts: r.ts || 0 }; changed = true; } else if ((l.ts || 0) > (r.ts || 0)) newer.push(`mem/${mid}`); }
+      return { changed, newer, isFull: !!remote };
+    }
+    // 전체 문서(초기 put)와 비교해 서버에 없는 로컬 셀을 찾음
+    function missingRemote(remote) {
+      const out = []; const rv = (remote && remote.vt) || {}, rm = (remote && remote.mem) || {};
+      for (const pid in S.vt) for (const mid in S.vt[pid]) if (!(rv[pid] && rv[pid][mid])) out.push(`vt/${pid}/${mid}`);
+      for (const mid in S.mem) if (!rm[mid]) out.push(`mem/${mid}`);
+      return out;
+    }
     function afterChange(changed) { save(); if (changed) { renderHome(); renderPool(); if ($('#modal').hidden === false && $('#modal-card').dataset.pid) openDetail($('#modal-card').dataset.pid); } else renderSyncStatus(); }
-    async function pull(force) {
-      if (!S.sync.url || busy) return; busy = true;
-      try { const remote = await get(); const m = merge(remote); if (m.localNewer) await put(state()); S.sync.last = now(); S.sync.err = ''; afterChange(m.changed || force); }
-      catch (e) { S.sync.err = e.message; save(); renderSyncStatus(); }
-      finally { busy = false; }
+    async function req(method, body) {
+      const r = await fetch(S.sync.url, { method, headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
+      if (r.status === 401 || r.status === 403) throw new Error('권한 없음 — Firebase 규칙(.read/.write)을 확인하세요');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return method === 'GET' ? r.json() : null;
+    }
+    function patchBody() {
+      const body = {};
+      dirty.forEach(p => { const s = p.split('/'); if (s[0] === 'vt') { const c = S.vt[s[1]] && S.vt[s[1]][s[2]]; if (c) body[p] = c; } else if (s[0] === 'mem' && S.mem[s[1]]) body[p] = S.mem[s[1]]; });
+      body.updatedAt = now(); return body;
     }
     async function push() {
       if (!S.sync.url) return; if (busy) { schedulePush(); return; } busy = true;
-      try { const remote = await get().catch(() => null); const m = remote ? merge(remote) : { changed: false }; await put(state()); S.sync.last = now(); S.sync.err = ''; afterChange(m.changed); }
-      catch (e) { S.sync.err = e.message; save(); renderSyncStatus(); }
+      try {
+        if (S.sync.kind === 'firebase') { if (dirty.size) await req('PATCH', patchBody()); }
+        else { const remote = await req('GET').catch(() => null); if (remote) merge(remote); await req('PUT', state()); }
+        dirty.clear(); S.sync.last = now(); S.sync.err = ''; save(); renderSyncStatus();
+      } catch (e) { S.sync.err = e.message; save(); renderSyncStatus(); clearTimeout(retryTimer); retryTimer = setTimeout(push, 5000); }
       finally { busy = false; }
     }
-    function schedulePush() { if (!S.sync.url) return; clearTimeout(pushTimer); pushTimer = setTimeout(push, 500); }
-    function start() { stop(); if (!S.sync.url) { renderSyncStatus(); return; } pull(true); timer = setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 5000); }
-    function stop() { clearInterval(timer); timer = null; }
-    async function createRoom() {
-      const prov = T.meta.syncProviders.jsonblob;
-      const r = await fetch(prov.create, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(state()) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      let url = r.headers.get('Location') || '';
-      const id = r.headers.get('X-jsonblob');
-      if (!url && id) url = prov.create + '/' + id;
-      if (url && !/^https?:/.test(url)) url = new URL(url, prov.create).href;
-      if (!url) throw new Error('저장소 주소를 받지 못했습니다 (브라우저가 응답 헤더를 숨김) — 직접 주소 연결(Firebase)을 이용하세요');
-      connect('jsonblob', url);
+    function schedulePush() { if (!S.sync.url) return; clearTimeout(pushTimer); pushTimer = setTimeout(push, 400); }
+    function markDirty(path) { if (!S.sync.url) return; dirty.add(path); schedulePush(); }
+    function markAllDirty() { Object.entries(S.vt).forEach(([pid, ms]) => Object.keys(ms).forEach(mid => dirty.add(`vt/${pid}/${mid}`))); Object.keys(S.mem).forEach(mid => dirty.add(`mem/${mid}`)); }
+    async function pull(force) {
+      if (!S.sync.url || busy) return; busy = true;
+      try { const remote = await req('GET'); const m = merge(remote || {}); m.newer.concat(missingRemote(remote)).forEach(p => dirty.add(p)); S.sync.last = now(); S.sync.err = ''; afterChange(m.changed || force); }
+      catch (e) { S.sync.err = e.message; save(); renderSyncStatus(); }
+      finally { busy = false; if (dirty.size) schedulePush(); }
     }
-    function connect(kind, url) { S.sync.kind = kind; S.sync.url = url; S.sync.err = ''; S.sync.last = 0; save(); start(); }
+    function applyStream(path, data, type) {
+      const full = type === 'put' && (!path || path === '/'); // 초기 전체 스냅샷만 '전체'로 취급 (patch는 부분)
+      const remote = (!path || path === '/') ? (expand(data) || {}) : partialFromPath(path, data);
+      const m = merge(remote);
+      if (full) missingRemote(remote).forEach(p => dirty.add(p));
+      m.newer.forEach(p => dirty.add(p));
+      S.sync.last = now(); S.sync.err = ''; esFails = 0;
+      afterChange(m.changed);
+      if (dirty.size) schedulePush();
+    }
+    function startStream() {
+      if (!window.EventSource) return false;
+      try { es = new EventSource(S.sync.url); } catch (e) { return false; }
+      const onMsg = e => { try { const o = JSON.parse(e.data); if (window.__syncLog) console.debug('[sync]', e.type, JSON.stringify(o).slice(0, 200)); applyStream(o.path, o.data, e.type); } catch (err) { /* 무시 */ } };
+      es.addEventListener('put', onMsg); es.addEventListener('patch', onMsg);
+      es.addEventListener('cancel', () => { S.sync.err = '읽기 권한이 취소됨 — 규칙 확인'; save(); renderSyncStatus(); });
+      es.onerror = () => { esFails++; if (esFails >= 3) { if (es) es.close(); es = null; startPoll(); S.sync.err = ''; } renderSyncStatus(); };
+      return true;
+    }
+    function startPoll() { stopPoll(); pull(true); pollTimer = setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 5000); }
+    function stopPoll() { clearInterval(pollTimer); pollTimer = null; }
+    function start() { stop(); if (!S.sync.url) { renderSyncStatus(); return; } if (!(S.sync.kind === 'firebase' && startStream())) startPoll(); }
+    function stop() { if (es) { es.close(); es = null; } stopPoll(); clearTimeout(pushTimer); clearTimeout(retryTimer); esFails = 0; }
+    const mode = () => S.sync.kind === 'firebase' ? (es && !pollTimer ? 'Firebase 실시간' : 'Firebase (5초 폴링)') : '직접 주소 (5초 폴링)';
+    function normalizeFirebase(dbUrl, room) {
+      let u = (dbUrl || '').trim().replace(/\/+$/, '');
+      if (!u) throw new Error('데이터베이스 주소를 입력하세요');
+      if (/\.json(\?.*)?$/.test(u)) return u;
+      if (!/^https:\/\//.test(u) && !/^http:\/\/localhost/.test(u)) throw new Error('https:// 로 시작하는 데이터베이스 주소를 입력하세요');
+      const r = (room || '').trim().replace(/[^\w-]/g, '') || ('family-' + Math.random().toString(36).slice(2, 8));
+      return `${u}/rooms/${r}.json`;
+    }
+    async function createFirebaseRoom(dbUrl, room) {
+      const url = normalizeFirebase(dbUrl, room);
+      const r = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' }).catch(() => { throw new Error('주소에 연결할 수 없습니다 — 오타 또는 네트워크 확인'); });
+      if (r.status === 401 || r.status === 403) throw new Error('규칙이 아직 닫혀 있습니다 — 3단계(규칙 게시)를 확인하세요');
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' — 주소를 확인하세요');
+      let remote = null; try { remote = await r.json(); } catch (e) { throw new Error('JSON 응답이 아닙니다 — Realtime Database 주소가 맞는지 확인'); }
+      stop(); S.sync.kind = 'firebase'; S.sync.url = url; S.sync.err = ''; S.sync.last = 0;
+      merge(remote || {}); markAllDirty();
+      const body = patchBody(); body.v = 1; body.app = 'seoul-winter-trip';
+      const w = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!w.ok) { S.sync.url = ''; S.sync.kind = ''; throw new Error(w.status === 401 || w.status === 403 ? '쓰기 규칙이 닫혀 있습니다 — 규칙 게시 확인' : 'HTTP ' + w.status); }
+      dirty.clear(); S.sync.last = now(); save(); start();
+    }
+    function connect(kind, url) { stop(); S.sync.kind = kind; S.sync.url = url; S.sync.err = ''; S.sync.last = 0; save(); markAllDirty(); start(); }
     function join(tokenOrUrl) {
-      let kind = 'url', url = tokenOrUrl.trim();
-      if (!/^https?:/.test(url)) { const o = JSON.parse(b64d(url)); kind = o.k || 'url'; url = o.u; }
+      let kind = '', url = (tokenOrUrl || '').trim();
+      if (!/^https?:/.test(url)) { const o = JSON.parse(b64d(url)); kind = o.k || ''; url = o.u; }
       if (!/^https:\/\/|^http:\/\/localhost/.test(url)) throw new Error('https 주소만 연결할 수 있습니다');
+      if (!kind || kind === 'jsonblob') kind = isFirebase(url) ? 'firebase' : 'url';
       connect(kind, url);
     }
     const token = () => b64e(JSON.stringify({ k: S.sync.kind, u: S.sync.url }));
     const link = () => `${location.origin}${location.pathname}#home/room=${token()}`;
-    function leave() { stop(); S.sync = Object.assign({}, S.sync, { kind: '', url: '', last: 0, err: '' }); save(); renderHome(); }
-    return { start, stop, pull, push, schedulePush, createRoom, join, link, leave, token };
+    function leave() { stop(); dirty.clear(); S.sync = Object.assign({}, S.sync, { kind: '', url: '', last: 0, err: '' }); save(); renderHome(); }
+    const debug = () => ({ kind: S.sync.kind, url: S.sync.url, es: es ? es.readyState : null, poll: !!pollTimer, dirty: [...dirty], esFails, busy, last: S.sync.last, err: S.sync.err });
+    return { start, stop, pull, push, markDirty, markAllDirty, schedulePush, createFirebaseRoom, join, link, leave, token, mode, debug };
   })();
 
   const fmtAgo = ts => { if (!ts) return ''; const s = Math.round((Date.now() - ts) / 1000); return s < 5 ? '방금' : s < 60 ? `${s}초 전` : s < 3600 ? `${Math.floor(s / 60)}분 전` : s < 86400 ? `${Math.floor(s / 3600)}시간 전` : `${Math.floor(s / 86400)}일 전`; };
   function renderSyncStatus() {
     const el = $('#sync-status'); if (!el) return;
-    if (!S.sync.url) { el.innerHTML = '<span class="dot off"></span> 이 기기에만 저장 중 — 아래에서 가족방을 만들면 서로의 찜이 실시간으로 보입니다'; return; }
-    el.innerHTML = S.sync.err ? `<span class="dot err"></span> 연결 오류: ${esc(S.sync.err)} · 자동 재시도 중` : `<span class="dot on"></span> 가족 공유 중 (${S.sync.kind === 'jsonblob' ? 'jsonblob' : '직접 주소'}) · 마지막 갱신 ${S.sync.last ? fmtAgo(S.sync.last) : '…'}`;
+    if (!S.sync.url) { el.innerHTML = '<span class="dot off"></span> 이 기기에만 저장 중 — 아래 안내대로 Firebase 가족방을 만들면 서로의 찜이 실시간으로 보입니다'; return; }
+    el.innerHTML = S.sync.err ? `<span class="dot err"></span> ${esc(S.sync.err)} · 자동 재시도 중` : `<span class="dot on"></span> 가족 공유 중 · ${SYNC.mode()} · 마지막 갱신 ${S.sync.last ? fmtAgo(S.sync.last) : '…'}`;
   }
   function renderSyncCard() {
     const el = $('#sync-card'); if (!el) return;
@@ -748,23 +822,34 @@
     acts.sort((a, b) => b.ts - a.ts);
     const feed = acts.slice(0, 6).map(a => { const m = T.members.find(x => x.id === a.mid); return `<li>${m ? m.emoji + ' ' + esc(memberName(m)) : '?'} ${a.on ? '❤️' : '💔'} <button class="link-btn" data-open="${a.pid}">${esc(byId[a.pid].name)}</button> <span class="muted">${fmtAgo(a.ts)}</span></li>`; }).join('');
     const connected = !!S.sync.url;
+    const room = connected ? (S.sync.url.match(/\/rooms\/([^/.]+)\.json/) || [])[1] : '';
     el.innerHTML = `
       <div class="me-row"><span class="small muted">나는</span><div class="me-chips">${meChips}</div></div>
       <p class="sync-status" id="sync-status"></p>
       <div class="sync-actions">${connected
-        ? `<button class="btn small primary" id="sync-link">🔗 가족 링크 복사</button><button class="btn small" id="sync-now">🔄 지금 갱신</button><button class="btn small danger" id="sync-leave">연결 해제</button>`
-        : `<button class="btn small primary" id="sync-create">✨ 가족방 만들기 (설정 없음)</button>
-           <details class="sync-more"><summary>직접 주소로 연결 (Firebase 등)</summary>
-             <div class="toolbar"><input type="url" id="sync-url" placeholder="https://…/rooms/family.json 또는 가족 링크의 코드"><button class="btn small" id="sync-join">연결</button></div>
-             <p class="small muted">Firebase Realtime Database를 쓰려면: 콘솔에서 프로젝트 생성 → Realtime Database 만들기 → 규칙을 <code>{"rules":{"rooms":{".read":true,".write":true}}}</code>로 게시 → 데이터베이스 주소 뒤에 <code>/rooms/우리집.json</code>을 붙여 여기에 입력. 가족방 만들기(jsonblob)는 공개 무료 저장소라 30일 이상 아무도 열지 않으면 지워질 수 있고, 그때는 각자 기기에 남은 찜을 새 방에 다시 올리면 됩니다.</p>
-           </details>`}
+        ? `<button class="btn small primary" id="sync-link">🔗 가족 링크 복사</button><button class="btn small" id="sync-now">🔄 지금 갱신</button><button class="btn small danger" id="sync-leave">연결 해제</button>${room ? `<span class="small muted">방 이름: <b>${esc(room)}</b></span>` : ''}`
+        : `<div class="fb-guide">
+            <b>🔥 Firebase로 가족방 만들기 (무료 · 약 5분, 한 사람만 하면 됩니다)</b>
+            <ol>
+              <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a>에 구글 계정으로 로그인 → <b>프로젝트 추가</b> (이름 아무거나, 애널리틱스는 꺼도 됨)</li>
+              <li>왼쪽 메뉴 <b>빌드 → Realtime Database → 데이터베이스 만들기</b> (위치 <b>asia-southeast1</b> 권장, <b>잠금 모드</b>로 시작)</li>
+              <li><b>규칙</b> 탭의 내용을 아래 것으로 바꾸고 <b>게시</b> <button class="btn small" id="fb-copy-rules">📋 규칙 복사</button><pre class="rules">${esc(FB_RULES)}</pre></li>
+              <li><b>데이터</b> 탭 위쪽에 보이는 주소(<code>https://…firebasedatabase.app</code>)를 복사해 아래에 붙여넣고 <b>가족방 만들기</b></li>
+            </ol>
+            <div class="toolbar"><input type="url" id="fb-url" placeholder="https://프로젝트명-default-rtdb.asia-southeast1.firebasedatabase.app" autocomplete="off"><input type="text" id="fb-room" placeholder="방 이름 (비우면 자동 생성)" autocomplete="off" style="flex:0 1 180px"><button class="btn small primary" id="fb-create">🔥 가족방 만들기</button></div>
+            <p class="small muted">방 주소를 아는 사람만 읽고 쓸 수 있습니다. 방 이름은 자동 생성(추측 어려운 값)을 권장합니다. 만든 뒤 "가족 링크 복사"로 가족에게 보내면 링크를 연 폰이 자동으로 합류합니다.</p>
+            <details class="sync-more"><summary>가족 링크 코드나 다른 JSON 저장소 주소로 연결</summary>
+              <div class="toolbar"><input type="text" id="sync-url" placeholder="가족 링크의 room= 뒤 코드, 또는 https://…/rooms/이름.json"><button class="btn small" id="sync-join">연결</button></div>
+            </details>
+          </div>`}
       </div>
       ${feed ? `<h3 class="mt small-h">최근 찜 활동</h3><ul class="activity">${feed}</ul>` : ''}`;
     renderSyncStatus();
   }
   document.addEventListener('click', async e => {
     const me = e.target.closest('[data-me]'); if (me) { S.sync.me = S.sync.me === me.dataset.me ? '' : me.dataset.me; save(); renderSyncCard(); return; }
-    if (e.target.id === 'sync-create') { e.target.disabled = true; try { await SYNC.createRoom(); renderHome(); toast('가족방을 만들었습니다 — 링크를 가족에게 보내세요'); } catch (err) { alert('가족방 생성 실패: ' + err.message); e.target.disabled = false; } return; }
+    if (e.target.id === 'fb-copy-rules') { try { await navigator.clipboard.writeText(FB_RULES); toast('규칙을 복사했습니다 — Firebase 규칙 탭에 붙여넣고 게시'); } catch (err) { prompt('아래 규칙을 복사하세요', FB_RULES); } return; }
+    if (e.target.id === 'fb-create') { const btn = e.target; btn.disabled = true; btn.textContent = '연결 중…'; try { await SYNC.createFirebaseRoom($('#fb-url').value, $('#fb-room').value); renderHome(); toast('가족방을 만들었습니다 — "가족 링크 복사"로 가족에게 보내세요'); } catch (err) { alert('가족방 만들기 실패: ' + err.message); btn.disabled = false; btn.textContent = '🔥 가족방 만들기'; } return; }
     if (e.target.id === 'sync-join') { try { SYNC.join($('#sync-url').value); renderHome(); toast('연결했습니다'); } catch (err) { alert('연결 실패: ' + err.message); } return; }
     if (e.target.id === 'sync-link') { const url = SYNC.link(); try { if (navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent)) { await navigator.share({ title: '서울 겨울 가족여행 — 가족방', url }); return; } await navigator.clipboard.writeText(url); toast('가족 링크를 복사했습니다'); } catch (err) { prompt('아래 링크를 복사하세요', url); } return; }
     if (e.target.id === 'sync-now') { SYNC.pull(true); toast('갱신 중…'); return; }
@@ -774,6 +859,7 @@
 
   /* ---------- 초기화 ---------- */
   function renderAll() { renderHome(); renderPool(); renderPlans(); renderMine(); }
+  window.__trip = { debug: () => SYNC.debug(), state: () => S };
   applyTheme(); renderAll(); checkShareHash(); route(); SYNC.start();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') SYNC.pull(); });
 })();
